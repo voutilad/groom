@@ -1,16 +1,28 @@
 plugins {
-    id 'java'
+    id 'application'
 }
-
 group 'io.sisu'
 version '1.0-SNAPSHOT'
 
 sourceCompatibility = 1.8
 
 repositories {
+    maven { url 'https://repo.spring.io/release' }
     mavenCentral()
 }
 
 dependencies {
-    testCompile group: 'junit', name: 'junit', version: '4.12'
+    implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: '2.10.3'
+    implementation group: 'io.projectreactor.netty', name: 'reactor-netty', version: '0.9.6.RELEASE'
+    implementation 'org.slf4j:slf4j-simple:1.7.30'
+    testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.6.1'
+    testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.6.1'
+}
+
+application {
+    mainClassName 'io.sisu.groom.GroomApplication'
+}
+
+test {
+    useJUnitPlatform()
 }
