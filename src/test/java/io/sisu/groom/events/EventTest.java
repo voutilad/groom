@@ -1,7 +1,5 @@
 package io.sisu.groom.events;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
@@ -9,8 +7,6 @@ import reactor.core.publisher.Mono;
 import java.util.Optional;
 
 public class EventTest {
-
-    private final ObjectMapper mapper = new ObjectMapper().registerModule(new Jdk8Module());
 
     @Test
     void deserializeJSON() throws Exception {

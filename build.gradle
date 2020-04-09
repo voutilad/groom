@@ -12,9 +12,11 @@ repositories {
 }
 
 dependencies {
+    implementation group: 'org.neo4j.driver', name: 'neo4j-java-driver', version: '4.0.1'
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jdk8', version: '2.10.3'
     implementation group: 'io.projectreactor.netty', name: 'reactor-netty', version: '0.9.6.RELEASE'
-    implementation 'org.slf4j:slf4j-simple:1.7.30'
+    implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.30'
+
     testImplementation group: 'org.junit.jupiter', name: 'junit-jupiter-api', version: '5.6.1'
     testRuntimeOnly group: 'org.junit.jupiter', name: 'junit-jupiter-engine', version: '5.6.1'
 }
