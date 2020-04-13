@@ -8,6 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 public class Event {
@@ -34,11 +36,11 @@ public class Event {
     private Type type;
     private Frame frame;
 
-    private Optional<Actor> actor;
-    private Optional<Actor> target;
-    private Optional<Integer> angle;
-    private Optional<Level> level;
+    private Actor actor;
+    private Optional<Actor> target = Optional.empty();
+    private Optional<Level> level = Optional.empty();
 
+    // Not really doing anything with these yet...
     int health;
     int card;
     int damage;
@@ -62,12 +64,26 @@ public class Event {
             if (event.frame == null) {
                 throw new Exception("frame cannot be null!");
             }
+            if (event.actor == null) {
+                throw new Exception("actor cannot be null!");
+            }
         } catch (Exception e) {
             logger.error("Could not parse json: " + e.getMessage());
             event = null;
         }
         return Mono.justOrEmpty(event);
     }
+
+    public Map<String, Object> toMap() {
+        HashMap<String, Object> map = new HashMap();
+        map.put("type", type.toString());
+        map.put("frame", frame.toMap());
+        map.put("actor", actor.toMap());
+        level.ifPresent(l -> map.put("level", l.toMap()));
+        target.ifPresent(t -> map.put("target", t.toMap()));
+        return map;
+    }
+
     @Override
     public String toString() {
         return String.format("Event[%s@%d]", type, frame.getTic());
@@ -89,11 +105,11 @@ public class Event {
         this.frame = frame;
     }
 
-    public Optional<Actor> getActor() {
+    public Actor getActor() {
         return actor;
     }
 
-    public void setActor(Optional<Actor> actor) {
+    public void setActor(Actor actor) {
         this.actor = actor;
     }
 
@@ -105,13 +121,6 @@ public class Event {
         this.target = target;
     }
 
-    public Optional<Integer> getAngle() {
-        return angle;
-    }
-
-    public void setAngle(Optional<Integer> angle) {
-        this.angle = angle;
-    }
 
     public Optional<Level> getLevel() {
         return level;

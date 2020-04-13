@@ -19,13 +19,20 @@ public class EventTest {
 
     @Test
     void typeCannotBeNull() {
-        Optional<Event> event = Event.fromJson("{\"angle\": 1234}").blockOptional();
+        Optional<Event> event = Event.fromJson("{\"frame\": {\"tic\": 1, \"millis\": 1}}").blockOptional();
         Assertions.assertFalse(event.isPresent());
     }
 
     @Test
     void frameCannotBeNull() {
-        Optional<Event> event = Event.fromJson("{\"type\": \"MOVE\"}").blockOptional();
+        Optional<Event> event = Event.fromJson("{\"type\": \"MOVE\", \"actor\": {\"id\": 1, \"type\": \"imp\"}}").blockOptional();
+
+        Assertions.assertFalse(event.isPresent());
+    }
+
+    @Test
+    void actorCannotBeNull() {
+        Optional<Event> event = Event.fromJson("{\"type\": \"MOVE\", \"frame\": {\"tic\": 1, \"millis\": 1}}").blockOptional();
         Assertions.assertFalse(event.isPresent());
     }
 
@@ -34,7 +41,7 @@ public class EventTest {
         Mono<Event> event = Event.fromJson("{\"type\": \"MOVE\", \"frame\":{}, \"actor\":{\"type\":\"shotgun_soldier\"}}");
         Optional<Event> maybeEvent = event.blockOptional();
         Assertions.assertTrue(maybeEvent.isPresent());
-        Assertions.assertEquals(Actor.Type.SHOTGUN_SOLDIER, maybeEvent.get().getActor().get().getType());
+        Assertions.assertEquals(Actor.Type.SHOTGUN_SOLDIER, maybeEvent.get().getActor().getType());
     }
 
     @Test
@@ -54,5 +61,12 @@ public class EventTest {
         Assertions.assertTrue(f1.compareTo(f2) < 0);
         Assertions.assertTrue(f1.compareTo(f1) == 0);
         Assertions.assertTrue(f2.compareTo(f1) > 0);
+    }
+
+    @Test
+    void missingTargetResultsInEmptyOptional() {
+        Mono<Event> event = Event.fromJson("{\"type\":\"move\",\"frame\":{\"millis\":40200,\"tic\":1407},\"actor\":{\"position\":{\"x\":-185472,\"y\":27469568,\"z\":0,\"angle\":1073741824,\"subsector\":4350048792},\"type\":\"shotgun_soldier\",\"health\":30,\"id\":4350211784}}\n");
+        Assertions.assertNotNull(event.block().getTarget());
+        Assertions.assertFalse(event.block().getTarget().isPresent());
     }
 }

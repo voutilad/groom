@@ -1,5 +1,7 @@
 package io.sisu.groom.events;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 public class Actor {
@@ -27,6 +29,18 @@ public class Actor {
     private Type type;
     private String id;
     private Optional<Position> position;
+    private int health;
+    private int armor;
+
+    public Map<String, Object> toMap() {
+        HashMap<String, Object> map = new HashMap();
+        map.put("type", type.toString().toLowerCase());
+        map.put("id", id);
+        map.put("health", health);
+        map.put("armor", armor);
+        position.ifPresent(pos -> map.put("position", pos.toMap()));
+        return map;
+    }
 
     public Type getType() {
         return type;
@@ -50,5 +64,21 @@ public class Actor {
 
     public void setPosition(Optional<Position> position) {
         this.position = position;
+    }
+
+    public int getHealth() {
+        return health;
+    }
+
+    public void setHealth(int health) {
+        this.health = health;
+    }
+
+    public int getArmor() {
+        return armor;
+    }
+
+    public void setArmor(int armor) {
+        this.armor = armor;
     }
 }

@@ -1,12 +1,25 @@
 package io.sisu.groom.events;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class Position {
     int x, y, z;
 
     // angle_t is an unsigned int in Doom like 3,221,225,472 which will overflow a signed 4 byte int
     long angle;
 
-    int subsector;
+    long subsector;
+
+    public Map<String, Object> toMap() {
+        HashMap<String, Object> map = new HashMap();
+        map.put("x", x);
+        map.put("y", y);
+        map.put("z", z);
+        map.put("angle", angle);
+        map.put("subsector", subsector);
+        return map;
+    }
 
     public int getX() {
         return x;
@@ -40,11 +53,11 @@ public class Position {
         this.angle = angle;
     }
 
-    public int getSubsector() {
+    public long getSubsector() {
         return subsector;
     }
 
-    public void setSubsector(int subsector) {
+    public void setSubsector(long subsector) {
         this.subsector = subsector;
     }
 }

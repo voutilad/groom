@@ -1,5 +1,8 @@
 package io.sisu.groom.events;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class Frame implements Comparable<Frame> {
     private int millis;
     private int tic;
@@ -18,6 +21,13 @@ public class Frame implements Comparable<Frame> {
 
     public void setTic(int tic) {
         this.tic = tic;
+    }
+
+    public Map<String, Object> toMap() {
+        HashMap<String, Object> map = new HashMap();
+        map.put("tic", tic);
+        map.put("millis", millis);
+        return map;
     }
 
     @Override
