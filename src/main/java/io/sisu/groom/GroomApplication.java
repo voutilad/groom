@@ -3,11 +3,13 @@ package io.sisu.groom;
 import io.sisu.groom.events.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Mono;
 import reactor.netty.Connection;
 import reactor.netty.udp.UdpServer;
 
 import java.time.Duration;
 import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class GroomApplication {
@@ -23,6 +25,13 @@ public class GroomApplication {
 		logger = LoggerFactory.getLogger(GroomApplication.class);
 	}
 
+	public static Mono<Integer> processEvents(List<Event> events) {
+		for (Event event : events) {
+
+		}
+		return Mono.just(0);
+	}
+
 	public static void main(String[] args) {
 		AtomicInteger eventCnt = new AtomicInteger(0);
 		logger.info("GROOM STARTING!");
@@ -36,11 +45,7 @@ public class GroomApplication {
 							.windowTimeout(WINDOW_SIZE, WINDOW_DURATION)
 							.map(windowFlux ->
 									windowFlux.collectSortedList(Comparator.comparing(Event::getFrame))
-											.map(events -> {
-												logger.info("In window, got " + events.size() + " events");
-												logger.info("running total: " + eventCnt.addAndGet(events.size()));
-												return events.size();
-											})
+											.map(GroomApplication::processEvents)
 											.subscribe())
 							.then())
 				.bindNow(Duration.ofSeconds(5));
