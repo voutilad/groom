@@ -9,12 +9,61 @@ import java.util.Optional;
 public class EventTest {
 
     @Test
-    void deserializeJSON() throws Exception {
-        String json = "{\"type\":\"move\",\"frame\":{\"millis\":109029,\"tic\":3816},\"actor\":{\"position\":{\"x\":-82259968,\"y\":29911040,\"z\":-11534336,\"angle\":3221225472,\"subsector\":49503504},\"type\":\"imp\",\"id\":49640152}}\n";
+    void deserializeJSON() {
+        String json = "{\"type\":\"targeted\",\"frame\":{\"millis\":40458,\"tic\":1416},\"actor\":{\"position\":{\"x\":3119532,\"y\":-1133745,\"z\":0,\"angle\":1006632960,\"subsector\":4350048376},\"type\":\"player\",\"health\":36,\"armor\":56,\"id\":4350176240},\"target\":{\"type\":\"barrel\",\"health\":5,\"id\":4350225776}}";
         Mono<Event> maybeEvent = Event.fromJson(json);
-        Optional<Event> event = maybeEvent.blockOptional();
-        Assertions.assertTrue(event.isPresent());
-        Assertions.assertEquals(Event.Type.MOVE, event.get().getType());
+        Event event = maybeEvent.block();
+
+        Assertions.assertNotNull(event);
+        Assertions.assertEquals(Event.Type.TARGETED, event.getType());
+        Assertions.assertNotNull(event.getActor());
+        Assertions.assertTrue(event.getTarget().isPresent());
+
+        Frame frame = event.getFrame();
+        Assertions.assertEquals(1416, frame.getTic());
+        Assertions.assertEquals(40458, frame.getMillis());
+
+        Actor actor = event.getActor();
+        Assertions.assertEquals(Actor.Type.PLAYER, actor.getType());
+        Assertions.assertEquals("4350176240", actor.getId());
+
+        Actor target = event.getTarget().get();
+        Assertions.assertEquals(Actor.Type.BARREL, target.getType());
+        Assertions.assertEquals("4350225776", target.getId());
+
+        Assertions.assertTrue(actor.getPosition().isPresent());
+        Position pos = actor.getPosition().get();
+        Assertions.assertNotNull(pos);
+        Assertions.assertEquals(4350048376L, pos.getSubsector());
+    }
+
+    @Test
+    void deserializeProblemJson() {
+        final String json = "{\"type\":\"targeted\",\"frame\":{\"millis\":7315,\"tic\":256},\"actor\":{\"position\":{\"x\":-4194304,\"y\":16777216,\"z\":0,\"angle\":3221225472,\"subsector\":4350048536},\"type\":\"spectre\",\"health\":150,\"id\":4350217592},\"target\":{\"type\":\"player\",\"health\":100,\"armor\":0,\"id\":4350176240}}";
+        Mono<Event> maybeEvent = Event.fromJson(json);
+        Event event = maybeEvent.block();
+
+        Assertions.assertNotNull(event);
+        Assertions.assertEquals(Event.Type.TARGETED, event.getType());
+        Assertions.assertNotNull(event.getActor());
+        Assertions.assertTrue(event.getTarget().isPresent());
+
+        Frame frame = event.getFrame();
+        Assertions.assertEquals(256, frame.getTic());
+        Assertions.assertEquals(7315, frame.getMillis());
+
+        Actor actor = event.getActor();
+        Assertions.assertEquals(Actor.Type.SPECTRE, actor.getType());
+        Assertions.assertEquals("4350217592", actor.getId());
+
+        Actor target = event.getTarget().get();
+        Assertions.assertEquals(Actor.Type.PLAYER, target.getType());
+        Assertions.assertEquals("4350176240", target.getId());
+
+        Assertions.assertTrue(actor.getPosition().isPresent());
+        Position pos = actor.getPosition().get();
+        Assertions.assertNotNull(pos);
+        Assertions.assertEquals(4350048536L, pos.getSubsector());
     }
 
     @Test

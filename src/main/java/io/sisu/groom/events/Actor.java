@@ -28,7 +28,7 @@ public class Actor {
 
     private Type type;
     private String id;
-    private Optional<Position> position;
+    private Optional<Position> position = Optional.empty();
     private int health;
     private int armor;
 

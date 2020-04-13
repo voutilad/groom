@@ -68,7 +68,7 @@ public class Event {
                 throw new Exception("actor cannot be null!");
             }
         } catch (Exception e) {
-            logger.error("Could not parse json: " + e.getMessage());
+            logger.error("Could not parse json: " + e.getMessage() + " --> " + json);
             event = null;
         }
         return Mono.justOrEmpty(event);

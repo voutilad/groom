@@ -20,10 +20,12 @@ public class Cypher {
 
             "CREATE INDEX ON :Frame(millis)",
             "CREATE INDEX ON :Actor(type)",
-            "CREATE INDEX ON :State:PlayerState(position)",
-            "CREATE INDEX ON :State:EnemyState(position)",
-            "CREATE INDEX ON :State:PlayerState(actorId)",
-            "CREATE INDEX ON :State:EnemyState(actorId)",
+            "CREATE INDEX ON :State(position)",
+            "CREATE INDEX ON :PlayerState(position)",
+            "CREATE INDEX ON :EnemyState(position)",
+            "CREATE INDEX ON :State(actorId)",
+            "CREATE INDEX ON :PlayerState(actorId)",
+            "CREATE INDEX ON :EnemyState(actorId)",
             "CREATE INDEX ON :Actor:Enemy(type)",
     };
 
