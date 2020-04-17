@@ -5,13 +5,16 @@ import org.neo4j.driver.Query;
 import org.neo4j.driver.exceptions.ClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MarkerFactory;
+import reactor.core.publisher.Flux;
 import reactor.netty.Connection;
 import reactor.netty.udp.UdpServer;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 public class GroomApplication {
   private static final Duration WINDOW_DURATION = Duration.ofSeconds(5);
@@ -38,15 +41,28 @@ public class GroomApplication {
                   db.write(new Query(query)).blockLast(Duration.ofSeconds(5));
                 } catch (ClientException ce) {
                   if (ce.code().endsWith("EquivalentSchemaRuleAlreadyExists")) {
-                    logger.info("schema constraint already exists per cypher statement: %s", query);
+                    logger.info(
+                        String.format(
+                            "schema constraint already exists per cypher statement: %s", query));
                   } else {
                     throw ce;
                   }
                 } catch (Exception e) {
-                  logger.error("Unexpected exception during db schema assertion: %s", e.getMessage());
+                  logger.error(
+                      String.format(
+                          "Unexpected exception during db schema assertion: %s", e.getMessage()));
                   System.exit(1);
                 }
               });
+
+      final List<Query> threadingQueries = Arrays.asList(
+              //Cypher.THREAD_FRAMES
+              Cypher.THREAD_EVENTS
+      )
+              .stream()
+              .map(Query::new)
+              .collect(Collectors.toList());
+      final AtomicInteger cnt = new AtomicInteger(0);
 
       Connection conn =
           UdpServer.create()
@@ -57,27 +73,36 @@ public class GroomApplication {
                       in.receive()
                           .asString()
                           .flatMap(Event::fromJson)
-                          .windowTimeout(WINDOW_SIZE, WINDOW_DURATION)
+                          .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION)
                           .map(
-                              windowFlux ->
-                                  windowFlux
-                                      .collectSortedList(Comparator.comparing(Event::getFrame))
-                                      .filter(list -> !list.isEmpty())
-                                      .map(
-                                          eventList -> {
-                                            logger.info("processing event list with size %d", eventList.size());
-                                            return Cypher.compileBulkEventComponentInsert(
-                                                eventList);
-                                          })
-                                      .map(query -> db.write(query).subscribe())
-                                      .subscribe())
+                              events -> {
+                                final int batchSize = events.size();
+                                logger.info(
+                                    String.format(
+                                        "processing %d events, new total is %d",
+                                        batchSize, cnt.addAndGet(batchSize)));
+                                return events;
+                              })
+                          .flatMap(Cypher::compileBulkEventComponentInsert)
+                              .map(query -> {
+                                  ArrayList<Query> queries = new ArrayList<>();
+                                  queries.add(query);
+                                  queries.add(new Query(Cypher.THREAD_FRAMES));
+                                  return queries;
+                              })
+                          .flatMap(db::writeBatch)
+                          .onErrorMap(
+                              throwable -> {
+                                logger.error("OH CRAP !!!! " + throwable.getMessage());
+                                return throwable;
+                              })
                           .then())
               .doOnBound(connection -> logger.info("READY FOR DATA!!!"))
               .bindNow(Duration.ofSeconds(15));
 
-      System.in.read();
+      conn.onDispose().block();
       logger.info("GROOM SHUTTING DOWN!");
-      conn.disposeNow();
+      logger.info("Finished after processing " + cnt.get() + " events");
     }
   }
 }

@@ -12,37 +12,57 @@ import reactor.core.publisher.Mono;
 import java.util.List;
 
 public class Database implements AutoCloseable {
-    private static Logger logger = LoggerFactory.getLogger(Database.class);
+  private static Logger logger = LoggerFactory.getLogger(Database.class);
 
-    public static final Config encryptedConfig =
-            Config.builder()
-                    .withLogging(Logging.slf4j())
-                    .withEncryption().build();
+  public static final Config encryptedConfig =
+      Config.builder().withLogging(Logging.slf4j()).withEncryption().build();
 
-    public static final Config defaultConfig =
-            Config.builder()
-                    .withLogging(Logging.slf4j()).build();
+  public static final Config defaultConfig = Config.builder().withLogging(Logging.slf4j()).build();
 
-    private final Driver driver;
+  private final Driver driver;
 
-    Database(Config config, String username, String password) {
-        driver = GraphDatabase.driver("neo4j://localhost:7687", AuthTokens.basic(username, password), config);
-    }
+  Database(Config config, String username, String password) {
+    driver =
+        GraphDatabase.driver(
+            "neo4j://localhost:7687", AuthTokens.basic(username, password), config);
+  }
 
-    public Flux<Record> write(Query query) {
-        return Flux.usingWhen(Mono.fromSupplier(driver::rxSession),
-                session -> session.writeTransaction(tx -> Flux.from(tx.run(query).records())),
-                RxSession::close);
-    }
+  public Flux<Record> write(Query query) {
+    return Flux.usingWhen(
+        Mono.fromSupplier(driver::rxSession),
+        session -> session.writeTransaction(tx -> Flux.from(tx.run(query).records())),
+        RxSession::close);
+  }
 
-    public Flux<ResultSummary> writeBatch(List<Query> queries) {
-        return Flux.usingWhen(Mono.fromSupplier(driver::rxSession),
-                session -> session.writeTransaction(tx -> Flux.fromIterable(queries).map(tx::run).flatMap(RxResult::consume)),
-                RxSession::close);
-    }
+  public Flux<ResultSummary> write2(Query query) {
+    return Flux.usingWhen(
+        Mono.fromSupplier(driver::rxSession),
+        session ->
+            session.writeTransaction(
+                tx -> Flux.fromArray(new Query[] {query}).map(tx::run).flatMap(RxResult::consume)),
+        RxSession::close);
+  }
 
-    @Override
-    public void close() throws Exception {
-        driver.close();
-    }
+  public Flux<ResultSummary> writeBatch(List<Query> queries) {
+    return Flux.usingWhen(
+        Mono.fromSupplier(driver::rxSession),
+        session ->
+            session.writeTransaction(
+                tx ->
+                    Flux.fromIterable(queries)
+                        .map(tx::run)
+                        .flatMap(RxResult::consume)
+                        .retry(10)
+                        .onErrorMap(
+                            throwable -> {
+                              logger.error("OH CRAP OH CRAP OH NO! " + throwable.getMessage());
+                              return throwable;
+                            })),
+        RxSession::close);
+  }
+
+  @Override
+  public void close() throws Exception {
+    driver.close();
+  }
 }
