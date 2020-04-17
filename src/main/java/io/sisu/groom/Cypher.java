@@ -18,6 +18,7 @@ public class Cypher {
     "CREATE CONSTRAINT ON (n:SubSector) ASSERT n.id IS UNIQUE",
     "CREATE INDEX ON :Frame(millis)",
     "CREATE INDEX ON :Event(counter)",
+    "CREATE INDEX ON :Event(type)",
     "CREATE INDEX ON :Actor(type)",
     "CREATE INDEX ON :Enemy(type)",
     "CREATE INDEX ON :State(position)",
@@ -65,33 +66,33 @@ public class Cypher {
       String.join(
           "\n",
           "MATCH (f:Frame) WHERE NOT (f)<-[:PREV_FRAME]-()",
-              "WITH f ORDER BY f.tic",
-              "WITH collect(f) AS frames",
-              "UNWIND apoc.coll.pairsMin(frames) AS pair",
-              "WITH pair[0] AS prev, pair[1] AS next",
-              "    CREATE (next)-[:PREV_FRAME]->(prev)");
+          "WITH f ORDER BY f.tic",
+          "WITH collect(f) AS frames",
+          "UNWIND apoc.coll.pairsMin(frames) AS pair",
+          "WITH pair[0] AS prev, pair[1] AS next",
+          "    CREATE (next)-[:PREV_FRAME]->(prev)");
 
   public static final String THREAD_EVENTS =
       String.join(
           "\n",
           "MATCH (e:Event) WHERE NOT (e)<-[:PREV_EVENT]-()",
-              "WITH e ORDER BY e.counter",
-              "WITH collect(e) AS events",
-              "UNWIND apoc.coll.pairsMin(events) AS pair",
-              "WITH pair[0] AS prev, pair[1] AS next",
-              "    CREATE (next)-[:PREV_EVENT]->(prev)");
+          "WITH e ORDER BY e.counter",
+          "WITH collect(e) AS events",
+          "UNWIND apoc.coll.pairsMin(events) AS pair",
+          "WITH pair[0] AS prev, pair[1] AS next",
+          "    CREATE (next)-[:PREV_EVENT]->(prev)");
 
   public static final String THREAD_STATES =
       String.join(
           "\n",
           "MATCH (a:Actor)",
-              "MATCH (s:State {actorId:a.id})-[:ACTOR_IN|:TARGET_IN]->(e:Event)",
-              "    WHERE NOT (s)<-[:PREV_STATE]-()",
-              "WITH s, e ORDER BY e.counter",
-              "WITH collect(s) AS states, s.actorId AS actorId",
-              "UNWIND apoc.coll.pairsMin(states) AS pair",
-              "WITH pair[0] AS prev, pair[1] AS next",
-              "    CREATE (next)-[:PREV_STATE]->(prev)");
+          "MATCH (s:State {actorId:a.id})-[:ACTOR_IN|:TARGET_IN]->(e:Event)",
+          "    WHERE NOT (s)<-[:PREV_STATE]-()",
+          "WITH s, e ORDER BY e.counter",
+          "WITH collect(s) AS states, s.actorId AS actorId",
+          "UNWIND apoc.coll.pairsMin(states) AS pair",
+          "WITH pair[0] AS prev, pair[1] AS next",
+          "    CREATE (next)-[:PREV_STATE]->(prev)");
 
   public static final String CURRENT_STATE_DELETE =
       "MATCH (a:Actor)-[r:CURRENT_STATE]->(old:State) DELETE r";
@@ -100,8 +101,8 @@ public class Cypher {
       String.join(
           "\n",
           "MATCH (s:State) WHERE NOT (s)<-[:PREV_STATE]-()",
-              "MATCH (a:Actor {id:s.actorId})",
-              "MERGE (a)-[:CURRENT_STATE]->(s)");
+          "MATCH (a:Actor {id:s.actorId})",
+          "MERGE (a)-[:CURRENT_STATE]->(s)");
 
   public static Mono<BulkQuery> compileBulkEventComponentInsert(List<Event> events) {
     if (events == null || events.isEmpty()) {

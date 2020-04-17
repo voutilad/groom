@@ -19,13 +19,15 @@ public class DatabaseTest {
       "{\"type\":\"move\",\"counter\": 44, \"frame\":{\"millis\":40229,\"tic\":1408},\"actor\":{\"position\":{\"x\":4141444,\"y\":-37142,\"z\":0,\"angle\":1275068416,\"subsector\":4350048376},\"type\":\"player\",\"health\":36,\"armor\":53,\"id\":4350176240}}";
 
     @Test
+    @Disabled
     void testThreading() {
         Database db = new Database(Database.defaultConfig, "neo4j", "password");
         List<Event> events = Arrays.asList(json1, json2, json3, json4)
                 .stream()
                 .map(json -> Event.fromJson(json).block())
                 .collect(Collectors.toList());
-        Query q = Cypher.compileBulkEventComponentInsert(events).block();
-        db.writeBatch(Arrays.asList(q, new Query(Cypher.THREAD_EVENTS), new Query(Cypher.THREAD_FRAMES))).blockLast();
+        BulkQuery q = Cypher.compileBulkEventComponentInsert(events).block();
+        db.writeSync(Arrays.asList(q.query
+                , new Query(Cypher.THREAD_EVENTS), new Query(Cypher.THREAD_FRAMES)));
     }
 }

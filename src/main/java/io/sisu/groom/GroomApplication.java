@@ -1,11 +1,13 @@
 package io.sisu.groom;
 
 import io.sisu.groom.events.Event;
+import io.sisu.util.BoundedArrayDeque;
+import io.sisu.util.Pair;
 import org.neo4j.driver.Query;
-import org.neo4j.driver.exceptions.ClientException;
-import org.neo4j.driver.summary.ResultSummary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.netty.Connection;
 import reactor.netty.udp.UdpServer;
 
@@ -15,8 +17,8 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class GroomApplication {
-  private static final Duration WINDOW_DURATION = Duration.ofSeconds(5);
-  private static final int WINDOW_SIZE = 5000;
+  private static final Duration WINDOW_DURATION = Duration.ofSeconds(2);
+  private static final int WINDOW_SIZE = 1_000;
 
   // Set up nicer logging output.
   private static final Logger logger;
@@ -28,33 +30,26 @@ public class GroomApplication {
     logger = LoggerFactory.getLogger(GroomApplication.class);
   }
 
+  public static void reportPerformance(BoundedArrayDeque<Pair<Long, Integer>> queue) {
+    // newest data is "in front", oldest "in back"
+    final long timeDeltaMillis = (queue.getFirst().a - queue.getLast().a);
+    final int eventSum = queue.getFirst().b - queue.getLast().b;
+    logger.info(
+        String.format(
+            "current performance: sum[%d], rate[%d events/s] timeDelta[%d ms]", eventSum,
+            Math.round(1000 * eventSum / timeDeltaMillis), timeDeltaMillis));
+  }
+
   public static void main(String[] args) throws Exception {
     logger.info("GROOM STARTING!");
 
     try (Database db = new Database(Database.defaultConfig, "neo4j", "password")) {
-      Arrays.stream(Cypher.SCHEMA_QUERIES)
-          .forEach(
-              query -> {
-                try {
-                  db.run(new Query(query)).block(Duration.ofSeconds(5));
-                } catch (ClientException ce) {
-                  if (ce.code().endsWith("EquivalentSchemaRuleAlreadyExists")) {
-                    logger.info(
-                        String.format(
-                            "schema constraint already exists per cypher statement: %s", query));
-                  } else {
-                    throw ce;
-                  }
-                } catch (Exception e) {
-                  logger.error(
-                      String.format(
-                          "Unexpected exception during db schema assertion: %s", e.getMessage()));
-                  System.exit(1);
-                }
-              });
+      db.initializeSchema();
 
       final AtomicInteger eventCnt = new AtomicInteger(0);
       final AtomicInteger completedCnt = new AtomicInteger(0);
+      final BoundedArrayDeque<Pair<Long, Integer>> statsQueue = new BoundedArrayDeque<>(50);
+      statsQueue.push(new Pair(System.currentTimeMillis(), 0));
 
       Connection conn =
           UdpServer.create()
@@ -66,35 +61,14 @@ public class GroomApplication {
                           .asString()
                           .flatMap(Event::fromJson)
                           .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION)
-                          .map(
-                              events -> {
-                                int batchSize = events.size();
-                                eventCnt.addAndGet(batchSize);
-                                logger.info("processing batch with size: " + batchSize);
-                                return events;
-                              })
                           .flatMap(Cypher::compileBulkEventComponentInsert)
-                          .map(
-                              bulkQuery -> {
-                                long start = System.currentTimeMillis();
-                                List<ResultSummary> results =
-                                    db.writeSync(
-                                        Arrays.asList(
-                                            bulkQuery.query,
-                                            new Query(Cypher.THREAD_FRAMES),
-                                            new Query(Cypher.THREAD_EVENTS),
-                                            new Query(Cypher.THREAD_STATES),
-                                            new Query(Cypher.CURRENT_STATE_DELETE),
-                                            new Query(Cypher.CURRENT_STATE_UPDATE)));
-                                completedCnt.addAndGet(bulkQuery.size);
-                                logger.info(
-                                    String.format(
-                                        "current db insertion rate: %d/s",
-                                        Math.round(
-                                            1000f
-                                                * bulkQuery.size
-                                                / (System.currentTimeMillis() - start))));
-                                return results;
+                          .map(db::writeSync)
+                          .flatMap(
+                              total -> {
+                                statsQueue.addFirst(
+                                    new Pair(System.currentTimeMillis(), completedCnt.addAndGet(total)));
+                                reportPerformance(statsQueue);
+                                return Mono.empty();
                               })
                           .onErrorMap(
                               throwable -> {
@@ -102,9 +76,34 @@ public class GroomApplication {
                                 return throwable;
                               })
                           .then())
-              .doOnBound(connection -> logger.info("READY FOR DATA!!!"))
+              .doOnBound(connection -> logger.info("READY FOR DATA!!! (ctrl-c to shutdown)"))
               .bindNow(Duration.ofSeconds(15));
 
+      final List<Query> threadingQueries =
+          Arrays.asList(
+              new Query(Cypher.THREAD_FRAMES),
+              new Query(Cypher.THREAD_EVENTS),
+              new Query(Cypher.THREAD_STATES),
+              new Query(Cypher.CURRENT_STATE_DELETE),
+              new Query(Cypher.CURRENT_STATE_UPDATE));
+
+      Flux.interval(Duration.ofSeconds(5))
+          .map(
+              junk -> {
+                logger.debug("starting threading...");
+                db.writeSync(threadingQueries);
+                logger.debug("done threading.");
+                return 0;
+              })
+          .subscribe();
+
+      Runtime.getRuntime()
+          .addShutdownHook(
+              new Thread(
+                  () -> {
+                    logger.info("WAITING UP TO 15s FOR CONNECTION TO CLOSE");
+                    conn.disposeNow(Duration.ofSeconds(15));
+                  }));
       conn.onDispose().block();
       logger.info("GROOM SHUTTING DOWN!");
       logger.info("Received " + eventCnt.get() + " events, processed " + completedCnt.get());
