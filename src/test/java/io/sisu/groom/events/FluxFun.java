@@ -21,6 +21,6 @@ public class FluxFun {
     Flux a = Flux.range(1, 4);
     Flux b = Flux.fromArray(new String[] {"dave", "dan", "jess"});
 
-    a.flatMap(val -> Flux.just(val).concatWith(b)).subscribe(System.out::println);
+    a.flatMap(val -> Flux.just(val).concatWith(b)).log().subscribe(System.out::println);
   }
 }

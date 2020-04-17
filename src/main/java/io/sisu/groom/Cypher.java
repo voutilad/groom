@@ -2,6 +2,7 @@ package io.sisu.groom;
 
 import io.sisu.groom.events.Event;
 import org.neo4j.driver.Query;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
@@ -84,14 +85,14 @@ public class Cypher {
   public static final String THREAD_STATES =
       String.join(
           "\n",
-          "MATCH (a:Actor)\n"
-              + "MATCH (s:State {actorId:a.id})-[:ACTOR_IN|:TARGET_IN]->(e:Event)"
-              + "    WHERE NOT (s)<-[:PREV_STATE]-()"
-              + "WITH s, e ORDER BY e.counter"
-              + "WITH collect(s) AS states, s.actorId AS actorId"
-              + "UNWIND apoc.coll.pairsMin(states) AS pair"
-              + "WITH pair[0] AS prev, pair[1] AS next"
-              + "    CREATE (next)-[:PREV_STATE]->(prev)");
+          "MATCH (a:Actor)",
+              "MATCH (s:State {actorId:a.id})-[:ACTOR_IN|:TARGET_IN]->(e:Event)",
+              "    WHERE NOT (s)<-[:PREV_STATE]-()",
+              "WITH s, e ORDER BY e.counter",
+              "WITH collect(s) AS states, s.actorId AS actorId",
+              "UNWIND apoc.coll.pairsMin(states) AS pair",
+              "WITH pair[0] AS prev, pair[1] AS next",
+              "    CREATE (next)-[:PREV_STATE]->(prev)");
 
   public static final String CURRENT_STATE_DELETE =
       "MATCH (a:Actor)-[r:CURRENT_STATE]->(old:State) DELETE r";
@@ -99,9 +100,9 @@ public class Cypher {
   public static final String CURRENT_STATE_UPDATE =
       String.join(
           "\n",
-          "MATCH (s:State) WHERE NOT (s)<-[:PREV_STATE]-()"
-              + "MATCH (a:Actor {id:s.actorId})"
-              + "MERGE (a)-[:CURRENT_STATE]->(s)");
+          "MATCH (s:State) WHERE NOT (s)<-[:PREV_STATE]-()",
+              "MATCH (a:Actor {id:s.actorId})",
+              "MERGE (a)-[:CURRENT_STATE]->(s)");
 
   public static Mono<Query> compileBulkEventComponentInsert(List<Event> events) {
     if (events == null || events.isEmpty()) {

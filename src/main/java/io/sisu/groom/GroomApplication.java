@@ -6,15 +6,15 @@ import org.neo4j.driver.exceptions.ClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 import reactor.netty.Connection;
 import reactor.netty.udp.UdpServer;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Collectors;
 
 public class GroomApplication {
   private static final Duration WINDOW_DURATION = Duration.ofSeconds(5);
@@ -38,7 +38,7 @@ public class GroomApplication {
           .forEach(
               query -> {
                 try {
-                  db.write(new Query(query)).blockLast(Duration.ofSeconds(5));
+                  db.run(new Query(query)).block(Duration.ofSeconds(5));
                 } catch (ClientException ce) {
                   if (ce.code().endsWith("EquivalentSchemaRuleAlreadyExists")) {
                     logger.info(
@@ -55,14 +55,8 @@ public class GroomApplication {
                 }
               });
 
-      final List<Query> threadingQueries = Arrays.asList(
-              //Cypher.THREAD_FRAMES
-              Cypher.THREAD_EVENTS
-      )
-              .stream()
-              .map(Query::new)
-              .collect(Collectors.toList());
       final AtomicInteger cnt = new AtomicInteger(0);
+      final long start = System.currentTimeMillis();
 
       Connection conn =
           UdpServer.create()
@@ -74,23 +68,23 @@ public class GroomApplication {
                           .asString()
                           .flatMap(Event::fromJson)
                           .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION)
-                          .map(
-                              events -> {
-                                final int batchSize = events.size();
-                                logger.info(
-                                    String.format(
-                                        "processing %d events, new total is %d",
-                                        batchSize, cnt.addAndGet(batchSize)));
-                                return events;
+                              .map( events -> {
+                                  int batchSize = events.size();
+                                  cnt.addAndGet(batchSize);
+                                  logger.info("processing batch with size: " + batchSize);
+                                  return events;
                               })
                           .flatMap(Cypher::compileBulkEventComponentInsert)
-                              .map(query -> {
-                                  ArrayList<Query> queries = new ArrayList<>();
-                                  queries.add(query);
-                                  queries.add(new Query(Cypher.THREAD_FRAMES));
-                                  return queries;
-                              })
-                          .flatMap(db::writeBatch)
+                          .map(
+                              query ->
+                                  Arrays.asList(
+                                      query,
+                                      new Query(Cypher.THREAD_FRAMES),
+                                      new Query(Cypher.THREAD_EVENTS),
+                                      new Query(Cypher.THREAD_STATES),
+                                      new Query(Cypher.CURRENT_STATE_DELETE),
+                                      new Query(Cypher.CURRENT_STATE_UPDATE)))
+                          .map(db::writeSync)
                           .onErrorMap(
                               throwable -> {
                                 logger.error("OH CRAP !!!! " + throwable.getMessage());
