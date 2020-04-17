@@ -3,22 +3,20 @@ package io.sisu.groom;
 import io.sisu.groom.events.Event;
 import org.neo4j.driver.Query;
 import org.neo4j.driver.exceptions.ClientException;
+import org.neo4j.driver.summary.ResultSummary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Scheduler;
-import reactor.core.scheduler.Schedulers;
 import reactor.netty.Connection;
 import reactor.netty.udp.UdpServer;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class GroomApplication {
   private static final Duration WINDOW_DURATION = Duration.ofSeconds(5);
-  private static final int WINDOW_SIZE = 500;
+  private static final int WINDOW_SIZE = 5000;
 
   // Set up nicer logging output.
   private static final Logger logger;
@@ -55,8 +53,8 @@ public class GroomApplication {
                 }
               });
 
-      final AtomicInteger cnt = new AtomicInteger(0);
-      final long start = System.currentTimeMillis();
+      final AtomicInteger eventCnt = new AtomicInteger(0);
+      final AtomicInteger completedCnt = new AtomicInteger(0);
 
       Connection conn =
           UdpServer.create()
@@ -68,23 +66,36 @@ public class GroomApplication {
                           .asString()
                           .flatMap(Event::fromJson)
                           .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION)
-                              .map( events -> {
-                                  int batchSize = events.size();
-                                  cnt.addAndGet(batchSize);
-                                  logger.info("processing batch with size: " + batchSize);
-                                  return events;
+                          .map(
+                              events -> {
+                                int batchSize = events.size();
+                                eventCnt.addAndGet(batchSize);
+                                logger.info("processing batch with size: " + batchSize);
+                                return events;
                               })
                           .flatMap(Cypher::compileBulkEventComponentInsert)
                           .map(
-                              query ->
-                                  Arrays.asList(
-                                      query,
-                                      new Query(Cypher.THREAD_FRAMES),
-                                      new Query(Cypher.THREAD_EVENTS),
-                                      new Query(Cypher.THREAD_STATES),
-                                      new Query(Cypher.CURRENT_STATE_DELETE),
-                                      new Query(Cypher.CURRENT_STATE_UPDATE)))
-                          .map(db::writeSync)
+                              bulkQuery -> {
+                                long start = System.currentTimeMillis();
+                                List<ResultSummary> results =
+                                    db.writeSync(
+                                        Arrays.asList(
+                                            bulkQuery.query,
+                                            new Query(Cypher.THREAD_FRAMES),
+                                            new Query(Cypher.THREAD_EVENTS),
+                                            new Query(Cypher.THREAD_STATES),
+                                            new Query(Cypher.CURRENT_STATE_DELETE),
+                                            new Query(Cypher.CURRENT_STATE_UPDATE)));
+                                completedCnt.addAndGet(bulkQuery.size);
+                                logger.info(
+                                    String.format(
+                                        "current db insertion rate: %d/s",
+                                        Math.round(
+                                            1000f
+                                                * bulkQuery.size
+                                                / (System.currentTimeMillis() - start))));
+                                return results;
+                              })
                           .onErrorMap(
                               throwable -> {
                                 logger.error("OH CRAP !!!! " + throwable.getMessage());
@@ -96,7 +107,7 @@ public class GroomApplication {
 
       conn.onDispose().block();
       logger.info("GROOM SHUTTING DOWN!");
-      logger.info("Finished after processing " + cnt.get() + " events");
+      logger.info("Received " + eventCnt.get() + " events, processed " + completedCnt.get());
     }
   }
 }

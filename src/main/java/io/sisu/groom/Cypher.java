@@ -2,7 +2,6 @@ package io.sisu.groom;
 
 import io.sisu.groom.events.Event;
 import org.neo4j.driver.Query;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.HashMap;
@@ -104,12 +103,13 @@ public class Cypher {
               "MATCH (a:Actor {id:s.actorId})",
               "MERGE (a)-[:CURRENT_STATE]->(s)");
 
-  public static Mono<Query> compileBulkEventComponentInsert(List<Event> events) {
+  public static Mono<BulkQuery> compileBulkEventComponentInsert(List<Event> events) {
     if (events == null || events.isEmpty()) {
       return Mono.empty();
     }
     Map<String, Object> params = new HashMap();
     params.put(UNWIND_PARAM, events.stream().map(Event::toMap).collect(Collectors.toList()));
-    return Mono.just(new Query(BULK_EVENT_INSERT_CYPHER, params));
+
+    return Mono.just(new BulkQuery(events.size(), new Query(BULK_EVENT_INSERT_CYPHER, params)));
   }
 }
