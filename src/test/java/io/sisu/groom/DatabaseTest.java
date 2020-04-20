@@ -1,6 +1,7 @@
 package io.sisu.groom;
 
 import io.sisu.groom.events.Event;
+import io.sisu.util.BulkQuery;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.neo4j.driver.Query;
