@@ -1,9 +1,11 @@
 package io.sisu.groom;
 
 import io.sisu.groom.events.Event;
+import io.sisu.util.BulkQuery;
 import org.neo4j.driver.Query;
 import reactor.core.publisher.Mono;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -103,6 +105,20 @@ public class Cypher {
           "MATCH (s:State) WHERE NOT (s)<-[:PREV_STATE]-()",
           "MATCH (a:Actor {id:s.actorId})",
           "MERGE (a)-[:CURRENT_STATE]->(s)");
+
+  public static final String INITIAL_STATE = String.join("\n",
+          "MATCH (a:Actor)-[:CURRENT_STATE]->(:State)-[:PREV_STATE*]->(first:State)",
+          "WHERE NOT (first)-[:PREV_STATE]->(:State) AND NOT (a)-[:INITIAL_STATE]->(first)",
+          "MERGE (a)-[:INITIAL_STATE]->(first)");
+
+  public static final List<Query> THREADING_QUERIES =
+          Arrays.asList(
+                  new Query(Cypher.THREAD_FRAMES),
+                  new Query(Cypher.THREAD_EVENTS),
+                  new Query(Cypher.THREAD_STATES),
+                  new Query(Cypher.CURRENT_STATE_DELETE),
+                  new Query(Cypher.CURRENT_STATE_UPDATE),
+                  new Query(Cypher.INITIAL_STATE));
 
   public static Mono<BulkQuery> compileBulkEventComponentInsert(List<Event> events) {
     if (events == null || events.isEmpty()) {

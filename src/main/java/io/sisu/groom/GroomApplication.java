@@ -3,7 +3,6 @@ package io.sisu.groom;
 import io.sisu.groom.events.Event;
 import io.sisu.util.BoundedArrayDeque;
 import io.sisu.util.Pair;
-import org.neo4j.driver.Query;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -12,13 +11,11 @@ import reactor.netty.Connection;
 import reactor.netty.udp.UdpServer;
 
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class GroomApplication {
   private static final Duration WINDOW_DURATION = Duration.ofSeconds(2);
-  private static final int WINDOW_SIZE = 1_000;
+  private static final int WINDOW_SIZE = 2_500;
 
   // Set up nicer logging output.
   private static final Logger logger;
@@ -34,10 +31,12 @@ public class GroomApplication {
     // newest data is "in front", oldest "in back"
     final long timeDeltaMillis = (queue.getFirst().a - queue.getLast().a);
     final int eventSum = queue.getFirst().b - queue.getLast().b;
-    logger.info(
-        String.format(
-            "current performance: sum[%d], rate[%d events/s] timeDelta[%d ms]", eventSum,
-            Math.round(1000 * eventSum / timeDeltaMillis), timeDeltaMillis));
+    if (timeDeltaMillis != 0) {
+      logger.info(
+          String.format(
+              "current performance: sum[%d], rate[%d events/s] timeDelta[%d ms]",
+              eventSum, Math.round(1000 * eventSum / timeDeltaMillis), timeDeltaMillis));
+    }
   }
 
   public static void main(String[] args) throws Exception {
@@ -48,12 +47,24 @@ public class GroomApplication {
 
       final AtomicInteger eventCnt = new AtomicInteger(0);
       final AtomicInteger completedCnt = new AtomicInteger(0);
-      final BoundedArrayDeque<Pair<Long, Integer>> statsQueue = new BoundedArrayDeque<>(50);
-      statsQueue.push(new Pair(System.currentTimeMillis(), 0));
 
+      // Our reporting stream...because it's fun to measure throughput. Sample every 5s, tracking
+      // the last 6 samples at most so we get a moving average of the past ~30s or so.
+      final BoundedArrayDeque<Pair<Long, Integer>> statsQueue = new BoundedArrayDeque<>(6);
+      Flux.interval(Duration.ofSeconds(5))
+          .map(
+              unused -> {
+                statsQueue.addFirst(new Pair(System.currentTimeMillis(), completedCnt.get()));
+                reportPerformance(statsQueue);
+                return Mono.empty();
+              })
+          .subscribe();
+
+      // Where the magic happens! Listen for a UDP stream of Doom Telemetry events and
+      // batch insert them into the database.
       Connection conn =
           UdpServer.create()
-              .host("127.0.0.1")
+              .host("0.0.0.0")
               .port(10666)
               .handle(
                   (in, out) ->
@@ -63,13 +74,7 @@ public class GroomApplication {
                           .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION)
                           .flatMap(Cypher::compileBulkEventComponentInsert)
                           .map(db::writeSync)
-                          .flatMap(
-                              total -> {
-                                statsQueue.addFirst(
-                                    new Pair(System.currentTimeMillis(), completedCnt.addAndGet(total)));
-                                reportPerformance(statsQueue);
-                                return Mono.empty();
-                              })
+                          .map(completedCnt::addAndGet)
                           .onErrorMap(
                               throwable -> {
                                 logger.error("OH CRAP !!!! " + throwable.getMessage());
@@ -79,24 +84,12 @@ public class GroomApplication {
               .doOnBound(connection -> logger.info("READY FOR DATA!!! (ctrl-c to shutdown)"))
               .bindNow(Duration.ofSeconds(15));
 
-      final List<Query> threadingQueries =
-          Arrays.asList(
-              new Query(Cypher.THREAD_FRAMES),
-              new Query(Cypher.THREAD_EVENTS),
-              new Query(Cypher.THREAD_STATES),
-              new Query(Cypher.CURRENT_STATE_DELETE),
-              new Query(Cypher.CURRENT_STATE_UPDATE));
-
+      // Handle setting up additional relationships
       Flux.interval(Duration.ofSeconds(5))
-          .map(
-              junk -> {
-                logger.debug("starting threading...");
-                db.writeSync(threadingQueries);
-                logger.debug("done threading.");
-                return 0;
-              })
+          .map(i -> db.writeSync(Cypher.THREADING_QUERIES))
           .subscribe();
 
+      // Try to be kind and use a shutdown hook. This will hopefully let some data flush through.
       Runtime.getRuntime()
           .addShutdownHook(
               new Thread(
@@ -104,6 +97,7 @@ public class GroomApplication {
                     logger.info("WAITING UP TO 15s FOR CONNECTION TO CLOSE");
                     conn.disposeNow(Duration.ofSeconds(15));
                   }));
+
       conn.onDispose().block();
       logger.info("GROOM SHUTTING DOWN!");
       logger.info("Received " + eventCnt.get() + " events, processed " + completedCnt.get());

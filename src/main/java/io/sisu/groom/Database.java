@@ -1,5 +1,6 @@
 package io.sisu.groom;
 
+import io.sisu.util.BulkQuery;
 import org.neo4j.driver.*;
 import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.reactive.RxSession;
