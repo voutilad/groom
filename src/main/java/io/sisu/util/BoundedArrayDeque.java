@@ -25,7 +25,7 @@ public class BoundedArrayDeque<T> extends ArrayDeque<T> {
     }
 
     private void removeLastIfTooBig() {
-        if (size() >= depth) {
+        if (size() > depth) {
             this.removeLast();
         }
     }
