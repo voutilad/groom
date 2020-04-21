@@ -70,7 +70,7 @@ public class GroomApplication {
                   (in, out) ->
                       in.receive()
                           .asString()
-                          .flatMap(Event::fromJson)
+                          .map(Event::fromJson)
                           .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION)
                           .flatMap(Cypher::compileBulkEventComponentInsert)
                           .map(db::writeSync)

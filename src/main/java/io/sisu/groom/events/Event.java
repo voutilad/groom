@@ -56,7 +56,7 @@ public class Event {
           .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
           .setPropertyNamingStrategy(new PropertyNamingStrategy.SnakeCaseStrategy());
 
-  public static Mono<Event> fromJson(String json) {
+  public static Event fromJson(String json) {
     Event event;
     try {
       event = mapper.readValue(json, Event.class);
@@ -79,7 +79,7 @@ public class Event {
       logger.error("Could not parse json: " + e.getMessage() + " --> " + json);
       event = null;
     }
-    return Mono.justOrEmpty(event);
+    return event;
   }
 
   public Map<String, Object> toMap() {
