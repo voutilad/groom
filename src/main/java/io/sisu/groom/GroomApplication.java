@@ -60,20 +60,20 @@ public class GroomApplication {
               })
           .subscribe();
 
-      // Where the magic happens! Listen for a UDP stream of Doom Telemetry events and
-      // batch insert them into the database.
-      Connection conn =
-          UdpServer.create()
-              .host("0.0.0.0")
-              .port(10666)
-              .handle(
-                  (in, out) ->
-                      in.receive()
-                          .asString()
-                          .map(Event::fromJson)
-                          .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION)
-                          .flatMap(Cypher::compileBulkEventComponentInsert)
-                          .map(db::writeSync)
+        // Where the magic happens! Listen for a UDP stream of Doom Telemetry events and
+        // batch insert them into the database.
+        Connection conn =
+            UdpServer.create()
+                .host("0.0.0.0")
+                .port(10666)
+                .handle(
+                    (in, out) ->
+                        in.receive()
+                            .asString()
+                            .map(Event::fromJson)
+                            .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION)
+                            .flatMap(Cypher::compileBulkEventComponentInsert)
+                            .flatMap(db::write)
                           .map(completedCnt::addAndGet)
                           .onErrorMap(
                               throwable -> {
