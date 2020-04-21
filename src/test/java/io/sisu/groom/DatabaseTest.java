@@ -25,7 +25,7 @@ public class DatabaseTest {
         Database db = new Database(Database.defaultConfig, "neo4j", "password");
         List<Event> events = Arrays.asList(json1, json2, json3, json4)
                 .stream()
-                .map(json -> Event.fromJson(json).block())
+                .map(Event::fromJson)
                 .collect(Collectors.toList());
         BulkQuery q = Cypher.compileBulkEventComponentInsert(events).block();
         db.writeSync(Arrays.asList(q.query
