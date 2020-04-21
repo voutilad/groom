@@ -3,15 +3,14 @@ package io.sisu.groom;
 import io.sisu.groom.events.Event;
 import io.sisu.util.BoundedArrayDeque;
 import io.sisu.util.Pair;
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.Connection;
 import reactor.netty.udp.UdpServer;
-
-import java.time.Duration;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class GroomApplication {
   private static final Duration WINDOW_DURATION = Duration.ofSeconds(2);
@@ -60,36 +59,35 @@ public class GroomApplication {
               })
           .subscribe();
 
-        // Where the magic happens! Listen for a UDP stream of Doom Telemetry events and
-        // batch insert them into the database.
-        Connection conn =
-            UdpServer.create()
-                .host("0.0.0.0")
-                .port(10666)
-                .handle(
-                    (in, out) ->
-                        in.receive()
-                            .asString()
-                            .map(Event::fromJson)
-                            .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION)
-                            .flatMap(Cypher::compileBulkEventComponentInsert)
-                            .flatMap(db::write)
-                            .map(completedCnt::addAndGet)
-                            .onErrorMap(
+      // Where the magic happens! Listen for a UDP stream of Doom Telemetry events and
+      // batch insert them into the database.
+      Connection conn =
+          UdpServer.create()
+              .host("0.0.0.0")
+              .port(10666)
+              .handle(
+                  (in, out) ->
+                      in.receive()
+                          .asString()
+                          .flatMap(Event::fromJson)
+                          .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION)
+                          .flatMap(Cypher::compileBulkEventComponentInsert)
+                          .flatMap(db::write)
+                          .map(completedCnt::addAndGet)
+                          .onErrorMap(
                               throwable -> {
                                 logger.error("OH CRAP !!!! " + throwable.getMessage());
                                 return throwable;
                               })
-                            .then(db.write(Cypher.THREADING_QUERIES))
-                )
+                          .then())
               .doOnBound(connection -> logger.info("READY FOR DATA!!! (ctrl-c to shutdown)"))
               .bindNow(Duration.ofSeconds(15));
-/*
+
       // Handle setting up additional relationships
       Flux.interval(Duration.ofSeconds(5))
-          .map(i -> db.writeSync(Cypher.THREADING_QUERIES))
+          .flatMap(i -> db.write(Cypher.THREADING_QUERIES))
           .subscribe();
-*/
+
       // Try to be kind and use a shutdown hook. This will hopefully let some data flush through.
       Runtime.getRuntime()
           .addShutdownHook(

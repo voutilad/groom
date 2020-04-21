@@ -1,14 +1,10 @@
 package io.sisu.groom;
 
 import io.sisu.util.BulkQuery;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
 import org.neo4j.driver.AuthTokens;
 import org.neo4j.driver.Config;
 import org.neo4j.driver.Driver;
@@ -26,6 +22,8 @@ import org.neo4j.driver.summary.ResultSummary;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 public class Database implements AutoCloseable {
   public static final Config encryptedConfig =
@@ -64,60 +62,32 @@ public class Database implements AutoCloseable {
               }
             });
   }
-    public Integer writeSync(BulkQuery bulkQuery) {
-        try (Session session = driver.session()) {
-            session.writeTransaction(
-                    tx -> {
-                        ResultSummary result = tx.run(bulkQuery.query).consume();
-                        logger.debug("wrote " + bulkQuery.size + " events to database");
-                        return result;
-                    });
-            return bulkQuery.size;
-        } catch (Exception e) {
-            logger.error("writeSync(BQ) ERROR!: " + e.getMessage());
-            throw e;
-        }
-    }
 
-    public Mono<Integer> write(BulkQuery bulkQuery) {
-        return Flux.usingWhen(
+  public Mono<Integer> write(BulkQuery bulkQuery) {
+    return Flux.usingWhen(
             Mono.fromSupplier(driver::rxSession),
             s -> s.writeTransaction(writeEvents(bulkQuery)),
-            RxSession::close
-        ).single();
-    }
+            RxSession::close)
+        .single();
+  }
 
-    private static RxTransactionWork<Publisher<Integer>> writeEvents(BulkQuery bulkQuery) {
-        return tx -> Mono.from(tx.run(bulkQuery.query).consume())
-            .doOnSuccess(r -> logger.debug("Wrote {} events to database", r.counters().nodesCreated()))
+  private static RxTransactionWork<Publisher<Integer>> writeEvents(BulkQuery bulkQuery) {
+    return tx ->
+        Mono.from(tx.run(bulkQuery.query).consume())
+            .doOnSuccess(
+                r -> logger.debug("Wrote {} events to database", r.counters().nodesCreated()))
             .doOnError(e -> logger.error("writeSync(BQ) ERROR!: " + e.getMessage()))
             .then(Mono.just(bulkQuery.size));
-    }
+  }
 
-    public Mono<Void> write(List<Query> queries) {
-        return Flux.usingWhen(
+  public Mono<Void> write(List<Query> queries) {
+    return Flux.usingWhen(
             Mono.fromSupplier(driver::rxSession),
-            s -> s.writeTransaction(tx -> Flux.fromIterable(queries).map(tx::run).map(RxResult::consume).log()),
-            RxSession::close
-        ).then();
-    }
-
-  public List<ResultSummary> writeSync(List<Query> queries) {
-    List<ResultSummary> results = new ArrayList<>();
-
-    try (Session session = driver.session()) {
-      session.writeTransaction(
-          tx -> {
-            for (Query q : queries) {
-              results.add(tx.run(q).consume());
-            }
-            return results.size();
-          });
-      return results;
-    } catch (Exception e) {
-      logger.error("writeSync ERROR!: " + e.getMessage());
-      return results;
-    }
+            s ->
+                s.writeTransaction(
+                    tx -> Flux.fromIterable(queries).map(tx::run).flatMap(RxResult::consume)),
+            RxSession::close)
+        .then();
   }
 
   public Mono<Record> run(Query query) {

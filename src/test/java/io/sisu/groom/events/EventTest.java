@@ -1,10 +1,9 @@
 package io.sisu.groom.events;
 
+import java.util.Optional;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Mono;
-
-import java.util.Optional;
 
 public class EventTest {
 
