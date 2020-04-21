@@ -19,6 +19,7 @@ import org.neo4j.driver.Record;
 import org.neo4j.driver.Session;
 import org.neo4j.driver.TransactionConfig;
 import org.neo4j.driver.exceptions.ClientException;
+import org.neo4j.driver.reactive.RxResult;
 import org.neo4j.driver.reactive.RxSession;
 import org.neo4j.driver.reactive.RxTransactionWork;
 import org.neo4j.driver.summary.ResultSummary;
@@ -91,6 +92,14 @@ public class Database implements AutoCloseable {
             .doOnSuccess(r -> logger.debug("Wrote {} events to database", r.counters().nodesCreated()))
             .doOnError(e -> logger.error("writeSync(BQ) ERROR!: " + e.getMessage()))
             .then(Mono.just(bulkQuery.size));
+    }
+
+    public Mono<Void> write(List<Query> queries) {
+        return Flux.usingWhen(
+            Mono.fromSupplier(driver::rxSession),
+            s -> s.writeTransaction(tx -> Flux.fromIterable(queries).map(tx::run).map(RxResult::consume).log()),
+            RxSession::close
+        ).then();
     }
 
   public List<ResultSummary> writeSync(List<Query> queries) {

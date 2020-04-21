@@ -74,21 +74,22 @@ public class GroomApplication {
                             .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION)
                             .flatMap(Cypher::compileBulkEventComponentInsert)
                             .flatMap(db::write)
-                          .map(completedCnt::addAndGet)
-                          .onErrorMap(
+                            .map(completedCnt::addAndGet)
+                            .onErrorMap(
                               throwable -> {
                                 logger.error("OH CRAP !!!! " + throwable.getMessage());
                                 return throwable;
                               })
-                          .then())
+                            .then(db.write(Cypher.THREADING_QUERIES))
+                )
               .doOnBound(connection -> logger.info("READY FOR DATA!!! (ctrl-c to shutdown)"))
               .bindNow(Duration.ofSeconds(15));
-
+/*
       // Handle setting up additional relationships
       Flux.interval(Duration.ofSeconds(5))
           .map(i -> db.writeSync(Cypher.THREADING_QUERIES))
           .subscribe();
-
+*/
       // Try to be kind and use a shutdown hook. This will hopefully let some data flush through.
       Runtime.getRuntime()
           .addShutdownHook(
