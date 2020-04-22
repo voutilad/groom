@@ -75,8 +75,7 @@ public class GroomApplication {
                           .map(Event::fromJson) // Filter out invalid / unwanted elements
                           .onErrorContinue(Event.InvalidEventException.class, (e, o) -> logger.error("Crap event " + e.getMessage()))
                           .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION) // Buffer a list of events
-                          .delayElements(Duration.ofSeconds(1)) // Queries create logs in some scenarios,
-                          .flatMap( // Create a completely separate stream from here on, as the handler won't end due to UDPs nature
+                          .concatMap( // Create a completely separate stream from here on, as the handler won't end due to UDPs nature
                               l -> Cypher.compileBulkEventComponentInsert(l)
                                   .flatMap(db::write)
                                   .map(completedCnt::addAndGet)
