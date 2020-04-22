@@ -80,7 +80,6 @@ public class GroomApplication {
 
         conn.onDispose().block();
         logger.info("GROOM SHUTTING DOWN!");
-        logger.info("Received " + eventCnt.get() + " events, processed " + completedCnt.get());
     }
   }
 
