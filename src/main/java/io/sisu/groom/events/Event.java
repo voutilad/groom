@@ -1,5 +1,6 @@
 package io.sisu.groom.events;
 
+import io.sisu.groom.exceptions.InvalidEventException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -79,25 +80,6 @@ public class Event {
       throw new InvalidEventException("Could not parse json: " + e.getMessage(), json);
     }
     return event;
-  }
-
-  public static class InvalidEventException extends RuntimeException {
-    private final String json;
-
-    public InvalidEventException(String message, String json) {
-      super(message);
-      this.json = json;
-    }
-
-    public InvalidEventException(String message) {
-      this(message, "n/a");
-    }
-
-    @Override public String toString() {
-      return "InvalidEventException{" +
-          "json='" + json + '\'' +
-          '}';
-    }
   }
 
   public Map<String, Object> toMap() {

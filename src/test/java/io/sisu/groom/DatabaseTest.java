@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import reactor.core.publisher.Mono;
 
 public class DatabaseTest {
 
@@ -28,7 +27,6 @@ public class DatabaseTest {
     List<Event> events =
         Arrays.asList(json1, json2, json3, json4).stream()
             .map(Event::fromJson)
-            .map(Mono::block)
             .collect(Collectors.toList());
     BulkQuery q = Cypher.compileBulkEventComponentInsert(events).block();
     db.write(q).block(Duration.ofSeconds(5));

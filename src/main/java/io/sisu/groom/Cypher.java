@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class Cypher {
+  public static String ENSURE_APOC = "RETURN apoc.version()";
+
   public static final String[] SCHEMA_QUERIES = {
     "CREATE CONSTRAINT ON (n:Mission) ASSERT n.id IS UNIQUE",
     "CREATE CONSTRAINT ON (n:Frame) ASSERT n.tic IS UNIQUE",

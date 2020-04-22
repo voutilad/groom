@@ -1,9 +1,8 @@
 package io.sisu.groom.events;
 
-import java.util.Optional;
+import io.sisu.groom.exceptions.InvalidEventException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import reactor.core.publisher.Mono;
 
 public class EventTest {
 
@@ -67,27 +66,27 @@ public class EventTest {
 
   @Test
   void counterCannotBeNull() {
-    Assertions.assertThrows(Event.InvalidEventException.class, () ->
+    Assertions.assertThrows(InvalidEventException.class, () ->
         Event.fromJson(
                 "{\"counter\": 0, \"type\": \"PICKUP_WEAPON\", \"weapon_type\":3, \"frame\":{}, \"actor\":{\"type\":\"shotgun_soldier\", \"position\":{}}}"));
   }
 
   @Test
   void typeCannotBeNull() {
-    Assertions.assertThrows(Event.InvalidEventException.class, () ->
+    Assertions.assertThrows(InvalidEventException.class, () ->
         Event.fromJson("{\"counter\": 0,\"frame\": {\"tic\": 1, \"millis\": 1}}"));
   }
 
   @Test
   void frameCannotBeNull() {
-    Assertions.assertThrows(Event.InvalidEventException.class, () ->
+    Assertions.assertThrows(InvalidEventException.class, () ->
         Event.fromJson(
                 "{\"counter\": 0,\"type\": \"MOVE\", \"actor\": {\"id\": 1, \"type\": \"imp\"}}"));
   }
 
   @Test
   void actorCannotBeNull() {
-    Assertions.assertThrows(Event.InvalidEventException.class, () ->
+    Assertions.assertThrows(InvalidEventException.class, () ->
         Event.fromJson(
                 "{\"counter\": 0, \"type\": \"MOVE\", \"frame\": {\"tic\": 1, \"millis\": 1}}"));
   }

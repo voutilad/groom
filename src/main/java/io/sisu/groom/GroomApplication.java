@@ -1,13 +1,13 @@
 package io.sisu.groom;
 
 import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.ScheduledReporter;
 import com.codahale.metrics.Slf4jReporter;
 import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.dropwizard.DropwizardConfig;
 import io.micrometer.core.instrument.dropwizard.DropwizardMeterRegistry;
 import io.micrometer.core.instrument.util.HierarchicalNameMapper;
+import io.sisu.groom.exceptions.InvalidEventException;
 import io.sisu.groom.events.Event;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
@@ -36,7 +36,8 @@ public class GroomApplication {
     logger.info("GROOM STARTING!");
 
     try (Database db = new Database(Database.defaultConfig, "neo4j", "password")) {
-      db.initializeSchema();
+      // Make sure we can connect
+      db.connect();
 
       // Where the magic happens! Listen for a UDP stream of Doom Telemetry events and
       // batch insert them into the database.
@@ -52,7 +53,7 @@ public class GroomApplication {
                           .name("incoming_events")
                           .metrics()
                           .onErrorContinue(
-                              Event.InvalidEventException.class,
+                              InvalidEventException.class,
                               (e, o) -> logger.error("Crap event " + e.getMessage()))
                           .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION) // Buffer a list of events
                           .concatMap(
@@ -81,8 +82,9 @@ public class GroomApplication {
                   }));
 
       conn.onDispose().block();
-      logger.info("GROOM SHUTTING DOWN!");
     }
+    Metrics.globalRegistry.close();
+    logger.info("GROOM SHUTTING DOWN!");
   }
 
   static void prepareMetricSystem() {
@@ -109,11 +111,11 @@ public class GroomApplication {
             return null;
           }
         });
-    ScheduledReporter reporter =
-        Slf4jReporter.forRegistry(dropWizardMetricRegistry)
-            .convertRatesTo(TimeUnit.SECONDS)
-            .convertDurationsTo(TimeUnit.MILLISECONDS)
-            .build();
-    reporter.start(10, TimeUnit.SECONDS);
+
+    Slf4jReporter.forRegistry(dropWizardMetricRegistry)
+        .convertRatesTo(TimeUnit.SECONDS)
+        .convertDurationsTo(TimeUnit.MILLISECONDS)
+        .build()
+        .start(10, TimeUnit.SECONDS);
   }
 }
