@@ -6,14 +6,11 @@ import io.micrometer.core.instrument.dropwizard.DropwizardConfig;
 import io.micrometer.core.instrument.dropwizard.DropwizardMeterRegistry;
 import io.micrometer.core.instrument.util.HierarchicalNameMapper;
 import io.sisu.groom.events.Event;
-import io.sisu.util.BoundedArrayDeque;
-import io.sisu.util.Pair;
 import reactor.netty.Connection;
 import reactor.netty.udp.UdpServer;
 
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,33 +34,13 @@ public class GroomApplication {
       prepareMetricSystem();
   }
 
-  public static void reportPerformance(BoundedArrayDeque<Pair<Long, Integer>> queue) {
-    // newest data is "in front", oldest "in back"
-    final long timeDeltaMillis = (queue.getFirst().a - queue.getLast().a);
-    final int eventSum = queue.getFirst().b - queue.getLast().b;
-    if (timeDeltaMillis != 0) {
-      logger.info(
-          String.format(
-              "current performance: sum[%d], rate[%d events/s] timeDelta[%d ms]",
-              eventSum, Math.round(1000 * eventSum / timeDeltaMillis), timeDeltaMillis));
-    }
-  }
-
-  public static void main(String[] args) throws Exception {
+    public static void main(String[] args) throws Exception {
     logger.info("GROOM STARTING!");
 
     try (Database db = new Database(Database.defaultConfig, "neo4j", "secret")) {
       db.initializeSchema();
 
-      final AtomicInteger eventCnt = new AtomicInteger(0);
-      final AtomicInteger completedCnt = new AtomicInteger(0);
-
-      // Our reporting stream...because it's fun to measure throughput. Sample every 5s, tracking
-      // the last 6 samples at most so we get a moving average of the past ~30s or so.
-      final BoundedArrayDeque<Pair<Long, Integer>> statsQueue = new BoundedArrayDeque<>(6);
-
-
-      // Where the magic happens! Listen for a UDP stream of Doom Telemetry events and
+        // Where the magic happens! Listen for a UDP stream of Doom Telemetry events and
       // batch insert them into the database.
       Connection conn =
           UdpServer.create()
