@@ -11,8 +11,7 @@ public class EventTest {
   void deserializeJSON() {
     String json =
         "{\"counter\": 0, \"type\":\"targeted\",\"frame\":{\"millis\":40458,\"tic\":1416},\"actor\":{\"position\":{\"x\":3119532,\"y\":-1133745,\"z\":0,\"angle\":1006632960,\"subsector\":4350048376},\"type\":\"player\",\"health\":36,\"armor\":56,\"id\":4350176240},\"target\":{\"type\":\"barrel\",\"health\":5,\"id\":4350225776}}";
-    Mono<Event> maybeEvent = Event.fromJson(json);
-    Event event = maybeEvent.block();
+    Event event = Event.fromJson(json);
 
     Assertions.assertNotNull(event);
     Assertions.assertEquals(Event.Type.TARGETED, event.getType());
@@ -41,8 +40,7 @@ public class EventTest {
   void deserializeProblemJson() {
     final String json =
         "{\"counter\": 0,\"type\":\"targeted\",\"frame\":{\"millis\":7315,\"tic\":256},\"actor\":{\"position\":{\"x\":-4194304,\"y\":16777216,\"z\":0,\"angle\":3221225472,\"subsector\":4350048536},\"type\":\"spectre\",\"health\":150,\"id\":4350217592},\"target\":{\"type\":\"player\",\"health\":100,\"armor\":0,\"id\":4350176240}}";
-    Mono<Event> maybeEvent = Event.fromJson(json);
-    Event event = maybeEvent.block();
+    Event event = Event.fromJson(json);
 
     Assertions.assertNotNull(event);
     Assertions.assertEquals(Event.Type.TARGETED, event.getType());
@@ -69,57 +67,45 @@ public class EventTest {
 
   @Test
   void counterCannotBeNull() {
-    Optional<Event> event =
+    Assertions.assertThrows(Event.InvalidEventException.class, () ->
         Event.fromJson(
-                "{\"counter\": 0, \"type\": \"PICKUP_WEAPON\", \"weapon_type\":3, \"frame\":{}, \"actor\":{\"type\":\"shotgun_soldier\", \"position\":{}}}")
-            .blockOptional();
-    Assertions.assertTrue(event.isPresent());
+                "{\"counter\": 0, \"type\": \"PICKUP_WEAPON\", \"weapon_type\":3, \"frame\":{}, \"actor\":{\"type\":\"shotgun_soldier\", \"position\":{}}}"));
   }
 
   @Test
   void typeCannotBeNull() {
-    Optional<Event> event =
-        Event.fromJson("{\"counter\": 0,\"frame\": {\"tic\": 1, \"millis\": 1}}").blockOptional();
-    Assertions.assertFalse(event.isPresent());
+    Assertions.assertThrows(Event.InvalidEventException.class, () ->
+        Event.fromJson("{\"counter\": 0,\"frame\": {\"tic\": 1, \"millis\": 1}}"));
   }
 
   @Test
   void frameCannotBeNull() {
-    Optional<Event> event =
+    Assertions.assertThrows(Event.InvalidEventException.class, () ->
         Event.fromJson(
-                "{\"counter\": 0,\"type\": \"MOVE\", \"actor\": {\"id\": 1, \"type\": \"imp\"}}")
-            .blockOptional();
-
-    Assertions.assertFalse(event.isPresent());
+                "{\"counter\": 0,\"type\": \"MOVE\", \"actor\": {\"id\": 1, \"type\": \"imp\"}}"));
   }
 
   @Test
   void actorCannotBeNull() {
-    Optional<Event> event =
+    Assertions.assertThrows(Event.InvalidEventException.class, () ->
         Event.fromJson(
-                "{\"counter\": 0, \"type\": \"MOVE\", \"frame\": {\"tic\": 1, \"millis\": 1}}")
-            .blockOptional();
-    Assertions.assertFalse(event.isPresent());
+                "{\"counter\": 0, \"type\": \"MOVE\", \"frame\": {\"tic\": 1, \"millis\": 1}}"));
   }
 
   @Test
   void caseInsensitiveEnumDeserialization() {
-    Mono<Event> event =
+    Event event =
         Event.fromJson(
             "{\"counter\": 0, \"type\": \"MOVE\", \"frame\":{}, \"actor\":{\"type\":\"shotgun_soldier\", \"position\":{}}}");
-    Optional<Event> maybeEvent = event.blockOptional();
-    Assertions.assertTrue(maybeEvent.isPresent());
-    Assertions.assertEquals(Actor.Type.SHOTGUN_SOLDIER, maybeEvent.get().getActor().getType());
+    Assertions.assertEquals(Actor.Type.SHOTGUN_SOLDIER, event.getActor().getType());
   }
 
   @Test
   void snakeCaseSupport() {
-    Mono<Event> event =
+    Event event =
         Event.fromJson(
             "{\"counter\": 0, \"type\": \"PICKUP_WEAPON\", \"weapon_type\":3, \"frame\":{}, \"actor\":{\"type\":\"shotgun_soldier\", \"position\":{}}}");
-    Optional<Event> maybeEvent = event.blockOptional();
-    Assertions.assertTrue(maybeEvent.isPresent());
-    Assertions.assertEquals(3, maybeEvent.get().getWeaponType());
+    Assertions.assertEquals(3, event.getWeaponType());
   }
 
   @Test
@@ -135,10 +121,10 @@ public class EventTest {
 
   @Test
   void missingTargetResultsInEmptyOptional() {
-    Mono<Event> event =
+    Event event =
         Event.fromJson(
             "{\"counter\": 0, \"type\":\"move\",\"frame\":{\"millis\":40200,\"tic\":1407},\"actor\":{\"position\":{\"x\":-185472,\"y\":27469568,\"z\":0,\"angle\":1073741824,\"subsector\":4350048792},\"type\":\"shotgun_soldier\",\"health\":30,\"id\":4350211784}}\n");
-    Assertions.assertNotNull(event.block().getTarget());
-    Assertions.assertFalse(event.block().getTarget().isPresent());
+    Assertions.assertNotNull(event.getTarget());
+    Assertions.assertFalse(event.getTarget().isPresent());
   }
 }

@@ -3,14 +3,16 @@ package io.sisu.groom;
 import io.sisu.groom.events.Event;
 import io.sisu.util.BoundedArrayDeque;
 import io.sisu.util.Pair;
-import java.time.Duration;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.netty.Connection;
 import reactor.netty.udp.UdpServer;
+
+import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GroomApplication {
   private static final Duration WINDOW_DURATION = Duration.ofSeconds(2);
@@ -41,7 +43,7 @@ public class GroomApplication {
   public static void main(String[] args) throws Exception {
     logger.info("GROOM STARTING!");
 
-    try (Database db = new Database(Database.defaultConfig, "neo4j", "password")) {
+    try (Database db = new Database(Database.defaultConfig, "neo4j", "secret")) {
       db.initializeSchema();
 
       final AtomicInteger eventCnt = new AtomicInteger(0);
@@ -50,6 +52,7 @@ public class GroomApplication {
       // Our reporting stream...because it's fun to measure throughput. Sample every 5s, tracking
       // the last 6 samples at most so we get a moving average of the past ~30s or so.
       final BoundedArrayDeque<Pair<Long, Integer>> statsQueue = new BoundedArrayDeque<>(6);
+
       Flux.interval(Duration.ofSeconds(5))
           .map(
               unused -> {
@@ -69,24 +72,22 @@ public class GroomApplication {
                   (in, out) ->
                       in.receive()
                           .asString()
-                          .flatMap(Event::fromJson)
-                          .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION)
-                          .flatMap(Cypher::compileBulkEventComponentInsert)
-                          .flatMap(db::write)
-                          .map(completedCnt::addAndGet)
-                          .onErrorMap(
-                              throwable -> {
-                                logger.error("OH CRAP !!!! " + throwable.getMessage());
-                                return throwable;
-                              })
-                          .then())
+                          .map(Event::fromJson) // Filter out invalid / unwanted elements
+                          .onErrorContinue(Event.InvalidEventException.class, (e, o) -> logger.error("Crap event " + e.getMessage()))
+                          .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION) // Buffer a list of events
+                          .delayElements(Duration.ofSeconds(1)) // Queries create logs in some scenarios,
+                          .flatMap( // Create a completely separate stream from here on, as the handler won't end due to UDPs nature
+                              l -> Cypher.compileBulkEventComponentInsert(l)
+                                  .flatMap(db::write)
+                                  .map(completedCnt::addAndGet)
+                                  .then(db.write(Cypher.THREADING_QUERIES))
+                          )
+                          .doOnComplete(() -> {
+                              logger.info("Handler completed.");
+                          })
+              )
               .doOnBound(connection -> logger.info("READY FOR DATA!!! (ctrl-c to shutdown)"))
-              .bindNow(Duration.ofSeconds(15));
-
-      // Handle setting up additional relationships
-      Flux.interval(Duration.ofSeconds(5))
-          .flatMap(i -> db.write(Cypher.THREADING_QUERIES))
-          .subscribe();
+          .bindNow(Duration.ofSeconds(15));
 
       // Try to be kind and use a shutdown hook. This will hopefully let some data flush through.
       Runtime.getRuntime()

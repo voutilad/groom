@@ -37,7 +37,7 @@ public class Database implements AutoCloseable {
   Database(Config config, String username, String password) {
     driver =
         GraphDatabase.driver(
-            "neo4j://localhost:7687", AuthTokens.basic(username, password), config);
+            "bolt://localhost:7687", AuthTokens.basic(username, password), config);
   }
 
   public void initializeSchema() {

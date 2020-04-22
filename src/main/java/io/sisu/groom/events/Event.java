@@ -1,16 +1,16 @@
 package io.sisu.groom.events;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Mono;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
 
 public class Event {
 
@@ -56,30 +56,48 @@ public class Event {
           .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
           .setPropertyNamingStrategy(new PropertyNamingStrategy.SnakeCaseStrategy());
 
-  public static Mono<Event> fromJson(String json) {
+  public static Event fromJson(String json) {
     Event event;
     try {
       event = mapper.readValue(json, Event.class);
       if (event.counter == null) {
-        throw new Exception("event counter should not be null!");
+        throw new InvalidEventException("event counter should not be null!");
       }
       if (event.type == null) {
-        throw new Exception("event type should not be null!");
+        throw new InvalidEventException("event type should not be null!");
       }
       if (event.frame == null) {
-        throw new Exception("frame cannot be null!");
+        throw new InvalidEventException("frame cannot be null!");
       }
       if (event.actor == null) {
-        throw new Exception("actor cannot be null!");
+        throw new InvalidEventException("actor cannot be null!");
       }
       if (!event.actor.getPosition().isPresent()) {
-        throw new Exception("actors require a position!");
+        throw new InvalidEventException("actors require a position!");
       }
     } catch (Exception e) {
-      logger.error("Could not parse json: " + e.getMessage() + " --> " + json);
-      event = null;
+      throw new InvalidEventException("Could not parse json: " + e.getMessage(), json);
     }
-    return Mono.justOrEmpty(event);
+    return event;
+  }
+
+  public static class InvalidEventException extends RuntimeException {
+    private final String json;
+
+    public InvalidEventException(String message, String json) {
+      super(message);
+      this.json = json;
+    }
+
+    public InvalidEventException(String message) {
+      this(message, "n/a");
+    }
+
+    @Override public String toString() {
+      return "InvalidEventException{" +
+          "json='" + json + '\'' +
+          '}';
+    }
   }
 
   public Map<String, Object> toMap() {
