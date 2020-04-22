@@ -43,6 +43,7 @@ public class Database implements Closeable {
     if (driver == null) {
       try {
         driver = GraphDatabase.driver(boltUri, authToken, config);
+        driver.verifyConnectivity();
       } catch (Exception e) {
         throw new GroomDatabaseException(e.getLocalizedMessage(), Problem.CONNECTION_FAILURE);
       }

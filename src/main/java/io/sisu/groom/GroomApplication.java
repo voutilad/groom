@@ -7,8 +7,8 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.dropwizard.DropwizardConfig;
 import io.micrometer.core.instrument.dropwizard.DropwizardMeterRegistry;
 import io.micrometer.core.instrument.util.HierarchicalNameMapper;
-import io.sisu.groom.exceptions.InvalidEventException;
 import io.sisu.groom.events.Event;
+import io.sisu.groom.exceptions.InvalidEventException;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -17,9 +17,6 @@ import reactor.netty.Connection;
 import reactor.netty.udp.UdpServer;
 
 public class GroomApplication {
-  private static final Duration WINDOW_DURATION = Duration.ofSeconds(2);
-  private static final int WINDOW_SIZE = 2_500;
-
   private static final Logger logger;
 
   static {
@@ -33,9 +30,18 @@ public class GroomApplication {
   }
 
   public static void main(String[] args) throws Exception {
-    logger.info("GROOM STARTING!");
+    Config config = new Config(args);
+    GroomApplication app = new GroomApplication();
+    app.run(config);
+  }
 
-    try (Database db = new Database(Database.defaultConfig, "neo4j", "password")) {
+  public void run(Config config) throws Exception {
+    logger.info("GROOM STARTING!");
+    logger.info("Using configuration: {}", config);
+
+    final Duration windowDuration = Duration.ofSeconds(config.flushInterval);
+
+    try (Database db = new Database(Database.defaultConfig, config.username, config.password)) {
       // Make sure we can connect
       db.connect();
 
@@ -43,8 +49,8 @@ public class GroomApplication {
       // batch insert them into the database.
       Connection conn =
           UdpServer.create()
-              .host("0.0.0.0")
-              .port(10666)
+              .host(config.udpHost)
+              .port(config.udpPort)
               .handle(
                   (in, out) ->
                       in.receive()
@@ -55,7 +61,7 @@ public class GroomApplication {
                           .onErrorContinue(
                               InvalidEventException.class,
                               (e, o) -> logger.error("Crap event " + e.getMessage()))
-                          .bufferTimeout(WINDOW_SIZE, WINDOW_DURATION) // Buffer a list of events
+                          .bufferTimeout(config.bufferSize, windowDuration) // Buffer a list of events
                           .concatMap(
                               // Create a completely separate stream from here on, as the
                               // handler won't end due to UDPs nature
