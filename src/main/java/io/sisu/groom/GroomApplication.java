@@ -37,7 +37,7 @@ public class GroomApplication {
     public static void main(String[] args) throws Exception {
     logger.info("GROOM STARTING!");
 
-    try (Database db = new Database(Database.defaultConfig, "neo4j", "secret")) {
+    try (Database db = new Database(Database.defaultConfig, "neo4j", "password")) {
       db.initializeSchema();
 
         // Where the magic happens! Listen for a UDP stream of Doom Telemetry events and
