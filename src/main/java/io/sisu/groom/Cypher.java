@@ -2,14 +2,13 @@ package io.sisu.groom;
 
 import io.sisu.groom.events.Event;
 import io.sisu.util.BulkQuery;
-import org.neo4j.driver.Query;
-import reactor.core.publisher.Mono;
-
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.neo4j.driver.Query;
+import reactor.core.publisher.Mono;
 
 public class Cypher {
   public static String ENSURE_APOC = "RETURN apoc.version()";
@@ -108,19 +107,23 @@ public class Cypher {
           "MATCH (a:Actor {id:s.actorId})",
           "MERGE (a)-[:CURRENT_STATE]->(s)");
 
-  public static final String INITIAL_STATE = String.join("\n",
-          "MATCH (a:Actor)-[:CURRENT_STATE]->(:State)-[:PREV_STATE*]->(first:State)",
-          "WHERE NOT (first)-[:PREV_STATE]->(:State) AND NOT (a)-[:INITIAL_STATE]->(first)",
+  public static final String INITIAL_STATE =
+      String.join(
+          "\n",
+          "MATCH (a:Actor)-[:CURRENT_STATE]->(:State) WHERE NOT (a)-[:INITIAL_STATE]->(:State)",
+          "WITH a",
+          "MATCH (a)-[:CURRENT_STATE]->(:State)-[:PREV_STATE*]->(first:State)",
+          "WHERE NOT (first)-[:PREV_STATE]->(:State)",
           "MERGE (a)-[:INITIAL_STATE]->(first)");
 
   public static final List<Query> THREADING_QUERIES =
-          Arrays.asList(
-                  new Query(Cypher.THREAD_FRAMES),
-                  new Query(Cypher.THREAD_EVENTS),
-                  new Query(Cypher.THREAD_STATES),
-                  new Query(Cypher.CURRENT_STATE_DELETE),
-                  new Query(Cypher.CURRENT_STATE_UPDATE),
-                  new Query(Cypher.INITIAL_STATE));
+      Arrays.asList(
+          new Query(Cypher.THREAD_FRAMES),
+          new Query(Cypher.THREAD_EVENTS),
+          new Query(Cypher.THREAD_STATES),
+          new Query(Cypher.CURRENT_STATE_DELETE),
+          new Query(Cypher.CURRENT_STATE_UPDATE),
+          new Query(Cypher.INITIAL_STATE));
 
   public static Mono<BulkQuery> compileBulkEventComponentInsert(List<Event> events) {
     if (events == null || events.isEmpty()) {
