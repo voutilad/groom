@@ -3,6 +3,8 @@ import time
 from socket import *
 cnt = 0
 s = socket(AF_INET, SOCK_DGRAM)
+
+start = time.time()
 with open(sys.argv[-1]) as f:
     for line in f.readlines():
         b = line.encode('ascii')
@@ -11,4 +13,5 @@ with open(sys.argv[-1]) as f:
         cnt = cnt + 1
         time.sleep(0.0003)
 
-print("SENT " + str(cnt) + " events")
+finish = time.time()
+print("SENT " + str(cnt) + " events [" + str(cnt/(finish-start)) + " ev/s]")

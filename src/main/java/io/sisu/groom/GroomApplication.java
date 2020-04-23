@@ -19,13 +19,14 @@ import reactor.netty.udp.UdpServer;
 public class GroomApplication {
   private static final Logger logger;
 
-  private static final String banner = "\n"
-      + "          _____ ______  _____  _____ ___  ___\n"
-      + "         |  __ \\| ___ \\|  _  ||  _  ||  \\/  |\n"
-      + "         | |  \\/| |_/ /| | | || | | || .  . |\n"
-      + "         | | __ |    / | | | || | | || |\\/| |\n"
-      + "         | |_\\ \\| |\\ \\ \\ \\_/ /\\ \\_/ /| |  | |\n"
-      + "          \\____/\\_| \\_| \\___/  \\___/ \\_|  |_/";
+  private static final String banner =
+      "\n"
+          + "          _____ ______  _____  _____ ___  ___\n"
+          + "         |  __ \\| ___ \\|  _  ||  _  ||  \\/  |\n"
+          + "         | |  \\/| |_/ /| | | || | | || .  . |\n"
+          + "         | | __ |    / | | | || | | || |\\/| |\n"
+          + "         | |_\\ \\| |\\ \\ \\ \\_/ /\\ \\_/ /| |  | |\n"
+          + "          \\____/\\_| \\_| \\___/  \\___/ \\_|  |_/";
 
   static {
     // Set up nicer logging output.
@@ -84,10 +85,7 @@ public class GroomApplication {
                                       .then(db.write(Cypher.THREADING_QUERIES))
                                       .name("stored_bulks")
                                       .metrics())
-                          .doOnComplete(
-                              () -> {
-                                logger.info("Handler completed.");
-                              }))
+                          .doOnComplete(() -> logger.info("udp handler completed")))
               .doOnBound(
                   connection ->
                       logger.info(
