@@ -32,10 +32,10 @@ public class Config {
   protected static final int DEFAULT_UDP_PORT = 10666;
 
   protected static final String KEY_BATCH_SIZE = "buffer-size";
-  protected static final int DEFAULT_BATCH_SIZE = 2000;
+  protected static final int DEFAULT_BATCH_SIZE = 5000;
 
   protected static final String KEY_WINDOW_TIMEOUT = "flush-interval";
-  protected static final int DEFAULT_FLUSH_INTERVAL = 3;
+  protected static final int DEFAULT_FLUSH_INTERVAL = 5;
 
   private static final ArgumentParser parser = ArgumentParsers.newFor("groom").build();
 
@@ -55,7 +55,7 @@ public class Config {
     ArgumentGroup udpGroup = parser.addArgumentGroup("UDP Event Listener");
     udpGroup
         .addArgument("--" + KEY_UDP_HOST)
-        .help("host or ip to bind to")
+        .help("IPv4 host to bind to")
         .setDefault(DEFAULT_UDP_HOST);
     udpGroup
         .addArgument("--" + KEY_UDP_PORT)
@@ -99,15 +99,18 @@ public class Config {
 
     udpHost = orString(ns, KEY_UDP_HOST, DEFAULT_UDP_HOST);
     udpPort = orInt(ns, KEY_UDP_PORT, DEFAULT_UDP_PORT);
+    if (0 > udpPort || udpPort > (0xffff - 2)) {
+      throw new ConfigException("udp port out of valid range", Problem.INVALID_VALUE);
+    }
 
     bufferSize = orInt(ns, KEY_BATCH_SIZE, DEFAULT_BATCH_SIZE);
-    if (250 > bufferSize || bufferSize > 5000) {
-      throw new ConfigException("buffer size out of acceptable range", Problem.INVALID_VALUE);
+    if (250 > bufferSize || bufferSize > 10_000) {
+      throw new ConfigException("buffer size out of a 'tolerable' range", Problem.INVALID_VALUE);
     }
 
     flushInterval = orInt(ns, KEY_WINDOW_TIMEOUT, DEFAULT_FLUSH_INTERVAL);
     if (0 > flushInterval || flushInterval > Integer.MAX_VALUE) {
-      throw new ConfigException("flush interval out of acceptable range", Problem.INVALID_VALUE);
+      throw new ConfigException("flush interval must be positive", Problem.INVALID_VALUE);
     }
   }
 
