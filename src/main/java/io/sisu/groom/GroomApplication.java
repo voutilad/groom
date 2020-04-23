@@ -19,6 +19,14 @@ import reactor.netty.udp.UdpServer;
 public class GroomApplication {
   private static final Logger logger;
 
+  private static final String banner = "\n"
+      + "          _____ ______  _____  _____ ___  ___\n"
+      + "         |  __ \\| ___ \\|  _  ||  _  ||  \\/  |\n"
+      + "         | |  \\/| |_/ /| | | || | | || .  . |\n"
+      + "         | | __ |    / | | | || | | || |\\/| |\n"
+      + "         | |_\\ \\| |\\ \\ \\ \\_/ /\\ \\_/ /| |  | |\n"
+      + "          \\____/\\_| \\_| \\___/  \\___/ \\_|  |_/";
+
   static {
     // Set up nicer logging output.
     System.setProperty("org.slf4j.simpleLogger.showDateTime", "true");
@@ -31,14 +39,16 @@ public class GroomApplication {
 
   public static void main(String[] args) throws Exception {
     Config config = new Config(args);
+
+    logger.info(banner);
+    logger.info("Using configuration: {}", config);
     GroomApplication app = new GroomApplication();
     app.run(config);
+    Metrics.globalRegistry.close();
+    logger.info("GROOM SHUTTING DOWN!");
   }
 
   public void run(Config config) throws Exception {
-    logger.info("GROOM STARTING!");
-    logger.info("Using configuration: {}", config);
-
     final Duration windowDuration = Duration.ofSeconds(config.flushInterval);
 
     try (Database db = new Database(Database.defaultConfig, config.username, config.password)) {
@@ -55,13 +65,16 @@ public class GroomApplication {
                   (in, out) ->
                       in.receive()
                           .asString()
+                          .name("incoming_strings")
+                          .metrics()
                           .map(Event::fromJson) // Filter out invalid / unwanted elements
                           .name("incoming_events")
                           .metrics()
                           .onErrorContinue(
                               InvalidEventException.class,
-                              (e, o) -> logger.error("Crap event " + e.getMessage()))
-                          .bufferTimeout(config.bufferSize, windowDuration) // Buffer a list of events
+                              (e, o) -> logger.error("Crap event: " + e.getMessage()))
+                          .bufferTimeout(
+                              config.bufferSize, windowDuration) // Buffer a list of events
                           .concatMap(
                               // Create a completely separate stream from here on, as the
                               // handler won't end due to UDPs nature
@@ -75,22 +88,20 @@ public class GroomApplication {
                               () -> {
                                 logger.info("Handler completed.");
                               }))
-              .doOnBound(connection -> logger.info("READY FOR DATA!!! (ctrl-c to shutdown)"))
+              .doOnBound(
+                  connection ->
+                      logger.info(
+                          "now listening on {}:{} (send ctrl-c to shutdown)",
+                          config.udpHost,
+                          config.udpPort))
               .bindNow(Duration.ofSeconds(15));
 
       // Try to be kind and use a shutdown hook. This will hopefully let some data flush through.
       Runtime.getRuntime()
-          .addShutdownHook(
-              new Thread(
-                  () -> {
-                    logger.info("WAITING UP TO 15s FOR CONNECTION TO CLOSE");
-                    conn.disposeNow(Duration.ofSeconds(15));
-                  }));
+          .addShutdownHook(new Thread(() -> conn.disposeNow(Duration.ofSeconds(15))));
 
       conn.onDispose().block();
     }
-    Metrics.globalRegistry.close();
-    logger.info("GROOM SHUTTING DOWN!");
   }
 
   static void prepareMetricSystem() {
