@@ -56,11 +56,12 @@ public class Database implements Closeable {
   public static void initializeSchema(Driver driver) throws GroomDatabaseException {
     try {
       Arrays.stream(Cypher.SCHEMA_QUERIES)
-          .forEach(query -> {
-            try (Session session = driver.session()) {
-              session.run(query).consume();
-            }
-          });
+          .forEach(
+              query -> {
+                try (Session session = driver.session()) {
+                  session.run(query).consume();
+                }
+              });
     } catch (ClientException ce) {
       if (!ce.code().endsWith("EquivalentSchemaRuleAlreadyExists")) {
         throw new GroomDatabaseException(ce.getMessage(), Problem.SCHEMA_FAILURE);
@@ -80,8 +81,12 @@ public class Database implements Closeable {
     return tx ->
         Mono.from(tx.run(bulkQuery.query).consume())
             .doOnSuccess(
-                r -> logger.debug("Wrote {} events to database", r.counters().nodesCreated()))
-            .doOnError(e -> logger.error("writeSync(BQ) ERROR!: " + e.getMessage()))
+                r ->
+                    logger.info(
+                        "wrote {} events to database, creating {} nodes",
+                        bulkQuery.size,
+                        r.counters().nodesCreated()))
+            .doOnError(e -> logger.error("writeEvents ERROR!: {}", e.getLocalizedMessage()))
             .then(Mono.just(bulkQuery.size));
   }
 
@@ -98,7 +103,15 @@ public class Database implements Closeable {
             Mono.fromSupplier(connect()::rxSession),
             s ->
                 s.writeTransaction(
-                    tx -> Flux.fromIterable(queries).map(tx::run).flatMap(RxResult::consume)),
+                    tx ->
+                        Flux.fromIterable(queries)
+                            .map(tx::run)
+                            .flatMap(RxResult::consume)
+                            .doOnComplete(() -> logger.info("write(L<Q>) complete, executed {} queries", queries.size()))
+                            .doOnError(
+                                e ->
+                                    logger.error(
+                                        "write(L<Q>) ERROR!: {}", e.getLocalizedMessage()))),
             RxSession::close)
         .then();
   }
