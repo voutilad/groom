@@ -35,6 +35,7 @@ public class Event {
   }
 
   private Integer counter;
+  private String session;
   private Type type;
   private Frame frame;
 
@@ -61,6 +62,9 @@ public class Event {
     Event event;
     try {
       event = mapper.readValue(json, Event.class);
+      if (event.session == null) {
+        throw new InvalidEventException("event session should not be null!");
+      }
       if (event.counter == null) {
         throw new InvalidEventException("event counter should not be null!");
       }
@@ -85,6 +89,7 @@ public class Event {
   public Map<String, Object> toMap() {
     HashMap<String, Object> map = new HashMap();
     map.put("counter", counter);
+    map.put("session", session);
     map.put("type", type.toString());
     map.put("frame", frame.toMap());
     map.put("actor", actor.toMap());
@@ -96,6 +101,14 @@ public class Event {
   @Override
   public String toString() {
     return String.format("Event[%s@%d]", type, frame.getTic());
+  }
+
+  public String getSession() {
+    return session;
+  }
+
+  public void setSession(String session) {
+    this.session = session;
   }
 
   public Integer getCounter() {

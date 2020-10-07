@@ -9,7 +9,7 @@ public class EventTest {
   @Test
   void deserializeJSON() {
     String json =
-        "{\"counter\": 0, \"type\":\"targeted\",\"frame\":{\"millis\":40458,\"tic\":1416},\"actor\":{\"position\":{\"x\":3119532,\"y\":-1133745,\"z\":0,\"angle\":1006632960,\"subsector\":4350048376},\"type\":\"player\",\"health\":36,\"armor\":56,\"id\":4350176240},\"target\":{\"type\":\"barrel\",\"health\":5,\"id\":4350225776}}";
+        "{\"session\": \"abc\", \"counter\": 0, \"type\":\"targeted\",\"frame\":{\"millis\":40458,\"tic\":1416},\"actor\":{\"position\":{\"x\":3119532,\"y\":-1133745,\"z\":0,\"angle\":1006632960,\"subsector\":4350048376},\"type\":\"player\",\"health\":36,\"armor\":56,\"id\":4350176240},\"target\":{\"type\":\"barrel\",\"health\":5,\"id\":4350225776}}";
     Event event = Event.fromJson(json);
 
     Assertions.assertNotNull(event);
@@ -38,7 +38,7 @@ public class EventTest {
   @Test
   void deserializeProblemJson() {
     final String json =
-        "{\"counter\": 0,\"type\":\"targeted\",\"frame\":{\"millis\":7315,\"tic\":256},\"actor\":{\"position\":{\"x\":-4194304,\"y\":16777216,\"z\":0,\"angle\":3221225472,\"subsector\":4350048536},\"type\":\"spectre\",\"health\":150,\"id\":4350217592},\"target\":{\"type\":\"player\",\"health\":100,\"armor\":0,\"id\":4350176240}}";
+        "{\"session\": \"abc\", \"counter\": 0,\"type\":\"targeted\",\"frame\":{\"millis\":7315,\"tic\":256},\"actor\":{\"position\":{\"x\":-4194304,\"y\":16777216,\"z\":0,\"angle\":3221225472,\"subsector\":4350048536},\"type\":\"spectre\",\"health\":150,\"id\":4350217592},\"target\":{\"type\":\"player\",\"health\":100,\"armor\":0,\"id\":4350176240}}";
     Event event = Event.fromJson(json);
 
     Assertions.assertNotNull(event);
@@ -68,34 +68,34 @@ public class EventTest {
   void counterCannotBeNull() {
     Assertions.assertThrows(InvalidEventException.class, () ->
         Event.fromJson(
-                "{\"counter\": 0, \"type\": \"PICKUP_WEAPON\", \"weapon_type\":3, \"frame\":{}, \"actor\":{\"type\":\"shotgun_soldier\", \"position\":{}}}"));
+                "{\"session\": \"abc\", \"type\": \"PICKUP_WEAPON\", \"weapon_type\":3, \"frame\":{}, \"actor\":{\"type\":\"shotgun_soldier\", \"position\":{}}}"));
   }
 
   @Test
   void typeCannotBeNull() {
     Assertions.assertThrows(InvalidEventException.class, () ->
-        Event.fromJson("{\"counter\": 0,\"frame\": {\"tic\": 1, \"millis\": 1}}"));
+        Event.fromJson("{\"session\": \"abc\", \"counter\": 0,\"frame\": {\"tic\": 1, \"millis\": 1}}"));
   }
 
   @Test
   void frameCannotBeNull() {
     Assertions.assertThrows(InvalidEventException.class, () ->
         Event.fromJson(
-                "{\"counter\": 0,\"type\": \"MOVE\", \"actor\": {\"id\": 1, \"type\": \"imp\"}}"));
+                "{\"session\": \"abc\", \"counter\": 0,\"type\": \"MOVE\", \"actor\": {\"id\": 1, \"type\": \"imp\"}}"));
   }
 
   @Test
   void actorCannotBeNull() {
     Assertions.assertThrows(InvalidEventException.class, () ->
         Event.fromJson(
-                "{\"counter\": 0, \"type\": \"MOVE\", \"frame\": {\"tic\": 1, \"millis\": 1}}"));
+                "{\"session\": \"abc\", \"counter\": 0, \"type\": \"MOVE\", \"frame\": {\"tic\": 1, \"millis\": 1}}"));
   }
 
   @Test
   void caseInsensitiveEnumDeserialization() {
     Event event =
         Event.fromJson(
-            "{\"counter\": 0, \"type\": \"MOVE\", \"frame\":{}, \"actor\":{\"type\":\"shotgun_soldier\", \"position\":{}}}");
+            "{\"session\": \"abc\", \"counter\": 0, \"type\": \"MOVE\", \"frame\":{}, \"actor\":{\"type\":\"shotgun_soldier\", \"position\":{}}}");
     Assertions.assertEquals(Actor.Type.SHOTGUN_SOLDIER, event.getActor().getType());
   }
 
@@ -103,7 +103,7 @@ public class EventTest {
   void snakeCaseSupport() {
     Event event =
         Event.fromJson(
-            "{\"counter\": 0, \"type\": \"PICKUP_WEAPON\", \"weapon_type\":3, \"frame\":{}, \"actor\":{\"type\":\"shotgun_soldier\", \"position\":{}}}");
+            "{\"session\": \"abc\", \"counter\": 0, \"type\": \"PICKUP_WEAPON\", \"weapon_type\":3, \"frame\":{}, \"actor\":{\"type\":\"shotgun_soldier\", \"position\":{}}}");
     Assertions.assertEquals(3, event.getWeaponType());
   }
 
@@ -122,7 +122,7 @@ public class EventTest {
   void missingTargetResultsInEmptyOptional() {
     Event event =
         Event.fromJson(
-            "{\"counter\": 0, \"type\":\"move\",\"frame\":{\"millis\":40200,\"tic\":1407},\"actor\":{\"position\":{\"x\":-185472,\"y\":27469568,\"z\":0,\"angle\":1073741824,\"subsector\":4350048792},\"type\":\"shotgun_soldier\",\"health\":30,\"id\":4350211784}}\n");
+            "{\"session\": \"abc\", \"counter\": 0, \"type\":\"move\",\"frame\":{\"millis\":40200,\"tic\":1407},\"actor\":{\"position\":{\"x\":-185472,\"y\":27469568,\"z\":0,\"angle\":1073741824,\"subsector\":4350048792},\"type\":\"shotgun_soldier\",\"health\":30,\"id\":4350211784}}\n");
     Assertions.assertNotNull(event.getTarget());
     Assertions.assertFalse(event.getTarget().isPresent());
   }
