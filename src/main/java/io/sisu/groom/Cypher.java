@@ -29,30 +29,32 @@ public class Cypher {
           new String[] {
             // Bulk construct event components
             "UNWIND $" + UNWIND_PARAM + " AS event",
-
-            // COMMON Event/Frame Logic
-            "MERGE (frame:Frame {tic: event.frame.tic}) ON CREATE SET frame.millis = event.frame.millis",
-            "CREATE (ev:Event {type: event.type, counter: event.counter})",
-            "CREATE (ev)-[:OCCURRED_AT]->(frame)",
-
-            // Conditionally process Actor and Target",
-            "FOREACH (thing IN [x IN [event.actor, event.target] WHERE x IS NOT NULL] |",
-            "    MERGE (actor:Actor {id: thing.id}) ON CREATE SET actor.type = thing.type",
-            "    MERGE (subsector:SubSector {id: thing.position.subsector})",
-            "    CREATE (actorState:State)",
-            "    SET actorState.position = point(thing.position),",
-            "        actorState.angle = thing.position.angle,",
-            "        actorState.health = thing.health,",
-            "        actorState.armor = thing.armor,",
-            "        actorState.actorId = thing.id",
-            "    CREATE (actorState)-[:IN_SUBSECTOR]->(subsector)",
-
-            // Hacky logic...hold your nose
-            "    FOREACH (_ IN CASE thing.id WHEN event.actor.id THEN [1] ELSE [] END | CREATE (actorState)-[:ACTOR_IN]->(ev))",
-            "    FOREACH (_ IN CASE thing.id WHEN event.target.id THEN [1] ELSE [] END | CREATE (actorState)-[:TARGET_IN]->(ev))",
-            "    FOREACH (_ IN CASE thing.type WHEN 'player' THEN [1] ELSE [] END | SET actor:Player, actorState:PlayerState)",
-            "    FOREACH (_ IN CASE thing.type WHEN 'player' THEN [] ELSE [1] END | SET actor:Enemy, actorState:EnemyState)",
-            ")",
+                  "MERGE (frame:Frame {tic: event.frame.tic, session: event.session})",
+                  "  ON CREATE SET frame.millis = event.frame.millis",
+                  "  CREATE (ev:Event {type: event.type, counter: event.counter})",
+                  "  CREATE (ev)-[:OCCURRED_AT]->(frame)",
+                  "  // Conditionally process Actor and Target",
+                  "  FOREACH (thing IN [x IN [event.actor, event.target] WHERE x IS NOT NULL] |",
+                  "          MERGE (actor:Actor {id: thing.id, session: event.session})",
+                  "  ON CREATE SET actor.type = thing.type",
+                  "  MERGE (subsector:SubSector {id: thing.position.subsector, session: event.session})",
+                  "  CREATE (actorState:State)",
+                  "  SET actorState.position = point(thing.position),",
+                  "  actorState.angle = thing.position.angle,",
+                  "  actorState.health = thing.health,",
+                  "  actorState.armor = thing.armor,",
+                  "  actorState.actorId = thing.id,",
+                  "  actorState.actorSession = event.session",
+                  "  CREATE (actorState)-[:IN_SUBSECTOR]->(subsector)",
+                  "  // Hacky logic...hold your nose",
+                  "  FOREACH (_ IN CASE thing.id WHEN event.actor.id",
+                  "          THEN [1] ELSE [] END | CREATE (actorState)-[:ACTOR_IN]->(ev))",
+                  "  FOREACH (_ IN CASE thing.id WHEN event.target.id",
+                  "          THEN [1] ELSE [] END | CREATE (actorState)-[:TARGET_IN]->(ev))",
+                  "  FOREACH (_ IN CASE thing.type WHEN 'player'",
+                  "          THEN [1] ELSE [] END | SET actor:Player, actorState:PlayerState)",
+                  "  FOREACH (_ IN CASE thing.type WHEN 'player'",
+                  "          THEN [] ELSE [1] END | SET actor:Enemy, actorState:EnemyState)",
           });
 
   public static final String THREAD_FRAMES =
@@ -79,7 +81,7 @@ public class Cypher {
       String.join(
           "\n",
           "MATCH (a:Actor)",
-          "MATCH (s:State {actorId:a.id})-[:ACTOR_IN|:TARGET_IN]->(e:Event)",
+          "MATCH (s:State {actorId:a.id, actorSession:a.session})-[:ACTOR_IN|:TARGET_IN]->(e:Event)",
           "    WHERE NOT (s)<-[:PREV_STATE]-()",
           "WITH s, e ORDER BY e.counter",
           "WITH collect(s) AS states, s.actorId AS actorId",
@@ -94,7 +96,7 @@ public class Cypher {
       String.join(
           "\n",
           "MATCH (s:State) WHERE NOT (s)<-[:PREV_STATE]-()",
-          "MATCH (a:Actor {id:s.actorId})",
+          "MATCH (a:Actor {id:s.actorId, session:s.actorSession})",
           "MERGE (a)-[:CURRENT_STATE]->(s)");
 
   public static final String INITIAL_STATE =
