@@ -16,6 +16,9 @@ public class Config {
   protected static final String KEY_BOLT_URI = "uri";
   protected static final String DEFAULT_BOLT_URI = "bolt://localhost:7687";
 
+  protected static final String KEY_DB_NAME = "db";
+  protected static final String DEFAULT_DB_NAME = "neo4j";
+
   protected static final String KEY_USERNAME = "user";
   protected static final String DEFAULT_USERNAME = "neo4j";
 
@@ -51,6 +54,7 @@ public class Config {
         .addArgument("--" + Config.KEY_USE_ENCRYPTION)
         .help("Ues a TLS Bolt connection?")
         .setDefault(DEFAULT_USE_ENCRYPTION);
+    hostGroup.addArgument("--" + KEY_DB_NAME).setDefault(DEFAULT_DB_NAME);
 
     ArgumentGroup udpGroup = parser.addArgumentGroup("UDP Event Listener");
     udpGroup
@@ -76,6 +80,7 @@ public class Config {
   public String udpHost;
   public int udpPort;
   public String boltUri;
+  public String dbName;
   public boolean useEncryption;
   public int bufferSize;
   public int flushInterval;
@@ -95,6 +100,7 @@ public class Config {
     username = orString(ns, KEY_USERNAME, DEFAULT_USERNAME);
     password = orString(ns, KEY_PASSWORD, DEFAULT_PASSWORD);
     boltUri = orString(ns, KEY_BOLT_URI, DEFAULT_BOLT_URI);
+    dbName = orString(ns, KEY_DB_NAME, DEFAULT_DB_NAME);
     useEncryption = orBool(ns, KEY_USE_ENCRYPTION, DEFAULT_USE_ENCRYPTION);
 
     udpHost = orString(ns, KEY_UDP_HOST, DEFAULT_UDP_HOST);
@@ -158,6 +164,9 @@ public class Config {
         + udpPort
         + ", boltUri='"
         + boltUri
+        + '\''
+        + ", dbName='"
+        + dbName
         + '\''
         + ", useEncryption="
         + useEncryption

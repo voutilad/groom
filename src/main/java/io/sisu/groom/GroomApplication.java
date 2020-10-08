@@ -52,7 +52,7 @@ public class GroomApplication {
   public void run(Config config) throws Exception {
     final Duration windowDuration = Duration.ofSeconds(config.flushInterval);
 
-    try (Database db = new Database(Database.defaultConfig, config.username, config.password)) {
+    try (Database db = new Database(config, config.username, config.password)) {
       // Make sure we can connect
       db.connect();
 

@@ -23,7 +23,7 @@ public class DatabaseTest {
   @Test
   @Disabled
   void testThreading() {
-    Database db = new Database(Database.defaultConfig, "neo4j", "password");
+    Database db = new Database(new Config(new String[]{}), "neo4j", "password");
     List<Event> events =
         Arrays.asList(json1, json2, json3, json4).stream()
             .map(Event::fromJson)

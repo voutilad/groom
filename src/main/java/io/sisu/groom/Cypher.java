@@ -13,24 +13,14 @@ import reactor.core.publisher.Mono;
 public class Cypher {
   public static String ENSURE_APOC = "RETURN apoc.version()";
 
-  public static final String[] SCHEMA_QUERIES = {
-    "CREATE CONSTRAINT ON (n:Mission) ASSERT n.id IS UNIQUE",
-    "CREATE CONSTRAINT ON (n:Frame) ASSERT n.tic IS UNIQUE",
-    "CREATE CONSTRAINT ON (n:Level) ASSERT n.id IS UNIQUE",
-    "CREATE CONSTRAINT ON (n:Actor) ASSERT n.id IS UNIQUE",
-    "CREATE CONSTRAINT ON (n:SubSector) ASSERT n.id IS UNIQUE",
-    "CREATE INDEX ON :Frame(millis)",
-    "CREATE INDEX ON :Event(counter)",
-    "CREATE INDEX ON :Event(type)",
-    "CREATE INDEX ON :Actor(type)",
-    "CREATE INDEX ON :Enemy(type)",
-    "CREATE INDEX ON :State(position)",
-    "CREATE INDEX ON :PlayerState(position)",
-    "CREATE INDEX ON :EnemyState(position)",
-    "CREATE INDEX ON :State(actorId)",
-    "CREATE INDEX ON :PlayerState(actorId)",
-    "CREATE INDEX ON :EnemyState(actorId)",
-  };
+  public static final String SCHEMA_ASSERT = "CALL apoc.schema.assert({\n" +
+          "  Frame: [[\"session\", \"id\"], [\"millis\"]],\n" +
+          "  Actor: [[\"session\", \"id\"], [\"id\"], [\"session\"]],\n" +
+          "  SubSector: [[\"session\", \"id\"]],\n" +
+          "  Enemy: [[\"session\", \"id\"], [\"type\"]],\n" +
+          "  State: [[\"session\", \"id\"]],\n" +
+          "  Player: [[\"session\", \"id\"]]\n" +
+          "}, {});";
 
   private static final String UNWIND_PARAM = "eventList";
   private static final String BULK_EVENT_INSERT_CYPHER =

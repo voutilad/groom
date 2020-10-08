@@ -7,14 +7,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import org.neo4j.driver.AuthToken;
-import org.neo4j.driver.AuthTokens;
-import org.neo4j.driver.Config;
-import org.neo4j.driver.Driver;
-import org.neo4j.driver.GraphDatabase;
-import org.neo4j.driver.Logging;
-import org.neo4j.driver.Query;
-import org.neo4j.driver.Session;
+
+import org.neo4j.driver.*;
 import org.neo4j.driver.exceptions.ClientException;
 import org.neo4j.driver.reactive.RxResult;
 import org.neo4j.driver.reactive.RxSession;
@@ -26,7 +20,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 public class Database implements Closeable {
-  public static final Config defaultConfig = Config.builder().withLogging(Logging.slf4j()).build();
+  public static final org.neo4j.driver.Config defaultConfig = org.neo4j.driver.Config.builder().withLogging(Logging.slf4j()).build();
   private static Logger logger = LoggerFactory.getLogger(Database.class);
 
   private Driver driver;
@@ -42,26 +36,20 @@ public class Database implements Closeable {
   public Driver connect() throws GroomDatabaseException {
     if (driver == null) {
       try {
-        driver = GraphDatabase.driver(boltUri, authToken, config);
+        driver = GraphDatabase.driver(config.boltUri, authToken, defaultConfig);
         driver.verifyConnectivity();
       } catch (Exception e) {
         throw new GroomDatabaseException(e.getLocalizedMessage(), Problem.CONNECTION_FAILURE);
       }
-      ensureAPOC(driver);
-      initializeSchema(driver);
+      ensureAPOC(driver, config);
+      initializeSchema(driver, config);
     }
     return driver;
   }
 
-  public static void initializeSchema(Driver driver) throws GroomDatabaseException {
-    try {
-      Arrays.stream(Cypher.SCHEMA_QUERIES)
-          .forEach(
-              query -> {
-                try (Session session = driver.session()) {
-                  session.run(query).consume();
-                }
-              });
+  public static void initializeSchema(Driver driver, Config config) throws GroomDatabaseException {
+    try (Session session = driver.session(SessionConfig.forDatabase(config.dbName))) {
+      session.run(Cypher.SCHEMA_ASSERT).consume();
     } catch (ClientException ce) {
       if (!ce.code().endsWith("EquivalentSchemaRuleAlreadyExists")) {
         throw new GroomDatabaseException(ce.getMessage(), Problem.SCHEMA_FAILURE);
@@ -69,8 +57,8 @@ public class Database implements Closeable {
     }
   }
 
-  private static void ensureAPOC(Driver driver) throws GroomDatabaseException {
-    try (Session session = driver.session()) {
+  private static void ensureAPOC(Driver driver, Config config) throws GroomDatabaseException {
+    try (Session session = driver.session(SessionConfig.forDatabase(config.dbName))) {
       session.run(Cypher.ENSURE_APOC).consume();
     } catch (ClientException ce) {
       throw new GroomDatabaseException(ce.getMessage(), Problem.MISSING_APOC);
@@ -92,7 +80,7 @@ public class Database implements Closeable {
 
   public Mono<Integer> write(BulkQuery bulkQuery) {
     return Flux.usingWhen(
-            Mono.fromSupplier(connect()::rxSession),
+            Mono.fromSupplier(() -> connect().rxSession(SessionConfig.forDatabase(config.dbName))),
             s -> s.writeTransaction(writeEvents(bulkQuery)),
             RxSession::close)
         .single();
@@ -100,7 +88,7 @@ public class Database implements Closeable {
 
   public Mono<Void> write(List<Query> queries) {
     return Flux.usingWhen(
-            Mono.fromSupplier(connect()::rxSession),
+            Mono.fromSupplier(() -> connect().rxSession(SessionConfig.forDatabase(config.dbName))),
             s ->
                 s.writeTransaction(
                     tx ->
