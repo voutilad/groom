@@ -31,10 +31,29 @@ C:> gradlew.bat distZip
 ```
 
 ## Running
-Assuming you've unpacked the dist zip/tar somewhere...
+Assuming you've unpacked the dist zip/tar somewhere...you can use the helpful `bin/groom[.bat]` script to run the app:
 
 ```
-$./bin/gradle -h
-```
+$ ./build/distributions/groom-1.0-SNAPSHOT/bin/groom --help
+usage: groom [-h] [--uri URI] [--user USER] [--password PASSWORD] [--tls TLS] [--db DB]
+             [--udp-host UDP_HOST] [--udp-port UDP_PORT] [--buffer-size BUFFER_SIZE]
+             [--flush-interval FLUSH_INTERVAL]
 
-Take a look at the args and then figure out what to set. I'll update the docs later :-)
+named arguments:
+  -h, --help             show this help message and exit
+
+Neo4j Host Settings:
+  --uri URI              Bolt URI to target Neo4j database (will override TLS setting)
+  --user USER
+  --password PASSWORD
+  --tls TLS              Ues a TLS Bolt connection?
+  --db DB
+
+UDP Event Listener:
+  --udp-host UDP_HOST    IPv4 host to bind to
+  --udp-port UDP_PORT    udp port to listen on
+  --buffer-size BUFFER_SIZE
+                         event buffer size
+  --flush-interval FLUSH_INTERVAL
+                         event buffer flush interval
+```
